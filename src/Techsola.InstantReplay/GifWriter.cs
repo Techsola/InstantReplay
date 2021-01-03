@@ -172,7 +172,7 @@ namespace Techsola.InstantReplay
                 while (true)
                 {
                     var currentLength = 1;
-                    var currentLengthWasFound = true;
+                    var didAddChildNode = false;
 
                     var rootCode = indexedImagePixels[currentIndex];
                     var currentNode = multibyteCodeRoots[rootCode] ??= new(rootCode);
@@ -181,9 +181,10 @@ namespace Techsola.InstantReplay
                     {
                         currentLength++;
 
-                        if (!currentNode.TryGetChildNode(indexedImagePixels[currentIndex + currentLength - 1], out var childNode))
+                        var childNode = currentNode.GetOrAddChildNode(indexedImagePixels[currentIndex + currentLength - 1], nextCode, out didAddChildNode);
+                        if (didAddChildNode)
                         {
-                            currentLengthWasFound = false;
+                            nextCode++;
                             break;
                         }
 
@@ -192,14 +193,11 @@ namespace Techsola.InstantReplay
 
                     bitPacker.WriteCode(currentNode.Code, currentCodeSize);
 
-                    if (currentLengthWasFound)
+                    if (!didAddChildNode)
                     {
                         // Being here means that currentLength was equal to remainingBytes.Length.
                         break;
                     }
-
-                    currentNode.AddChildNode(indexedImagePixels[currentIndex + currentLength - 1], nextCode);
-                    nextCode++;
 
                     const ushort maxAllowedCodeValue = 4095;
                     if (nextCode > maxAllowedCodeValue)

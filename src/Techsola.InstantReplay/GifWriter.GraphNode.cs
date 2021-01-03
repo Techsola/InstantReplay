@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Techsola.InstantReplay
 {
@@ -16,18 +15,22 @@ namespace Techsola.InstantReplay
 
             public ushort Code { get; }
 
-            public bool TryGetChildNode(byte childKey, [NotNullWhen(true)] out GraphNode? childNode)
+            public GraphNode GetOrAddChildNode(byte childKey, ushort nextCode, out bool didAdd)
             {
-                if (children is not null && children.TryGetValue(childKey, out childNode))
-                    return true;
+                children ??= new();
 
-                childNode = null;
-                return false;
-            }
+                if (!children.TryGetValue(childKey, out var childNode))
+                {
+                    childNode = new(nextCode);
+                    children.Add(childKey, childNode);
+                    didAdd = true;
+                }
+                else
+                {
+                    didAdd = false;
+                }
 
-            public void AddChildNode(byte childKey, ushort childCode)
-            {
-                (children ??= new()).Add(childKey, new(childCode));
+                return childNode;
             }
         }
     }
