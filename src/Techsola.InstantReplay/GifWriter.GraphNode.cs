@@ -1,12 +1,10 @@
-using System.Collections.Generic;
-
 namespace Techsola.InstantReplay
 {
     partial class GifWriter
     {
         private sealed class GraphNode
         {
-            private Dictionary<byte, GraphNode>? children;
+            private GraphNode?[]? children;
 
             public GraphNode(ushort code)
             {
@@ -17,12 +15,13 @@ namespace Techsola.InstantReplay
 
             public GraphNode GetOrAddChildNode(byte childKey, ushort nextCode, out bool didAdd)
             {
-                children ??= new();
+                children ??= new GraphNode[256];
 
-                if (!children.TryGetValue(childKey, out var childNode))
+                var childNode = children[childKey];
+                if (childNode is null)
                 {
                     childNode = new(nextCode);
-                    children.Add(childKey, childNode);
+                    children[childKey] = childNode;
                     didAdd = true;
                 }
                 else
