@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -167,28 +166,31 @@ namespace Techsola.InstantReplay
             {
                 var nextCode = (ushort)(endOfInformationCode + 1);
 
-                // TODO: compare performance between repeated lookups from a single dictionary (this code) with a tree
-                // data structure.
-                var multibyteCodes = new Dictionary<(ushort PrefixCode, byte Suffix), ushort>();
+                var multibyteCodeRoots = new GraphNode?[256];
 
                 var currentIndex = 0;
                 while (true)
                 {
-                    var prefixCode = (ushort)indexedImagePixels[currentIndex];
                     var currentLength = 1;
                     var currentLengthWasFound = true;
+
+                    var rootCode = indexedImagePixels[currentIndex];
+                    var currentNode = multibyteCodeRoots[rootCode] ??= new(rootCode);
 
                     while (currentIndex + currentLength < indexedImagePixels.Length)
                     {
                         currentLength++;
 
-                        currentLengthWasFound = multibyteCodes.TryGetValue((prefixCode, indexedImagePixels[currentIndex + currentLength - 1]), out var code);
-                        if (!currentLengthWasFound) break;
+                        if (!currentNode.TryGetChildNode(indexedImagePixels[currentIndex + currentLength - 1], out var childNode))
+                        {
+                            currentLengthWasFound = false;
+                            break;
+                        }
 
-                        prefixCode = code;
+                        currentNode = childNode;
                     }
 
-                    bitPacker.WriteCode(prefixCode, currentCodeSize);
+                    bitPacker.WriteCode(currentNode.Code, currentCodeSize);
 
                     if (currentLengthWasFound)
                     {
@@ -196,7 +198,7 @@ namespace Techsola.InstantReplay
                         break;
                     }
 
-                    multibyteCodes.Add((prefixCode, indexedImagePixels[currentIndex + currentLength - 1]), nextCode);
+                    currentNode.AddChildNode(indexedImagePixels[currentIndex + currentLength - 1], nextCode);
                     nextCode++;
 
                     const ushort maxAllowedCodeValue = 4095;
@@ -206,7 +208,7 @@ namespace Techsola.InstantReplay
 
                         currentCodeSize = (byte)(bitsPerIndexedPixel + 1);
                         nextCode = (ushort)(endOfInformationCode + 1);
-                        multibyteCodes.Clear();
+                        Array.Clear(multibyteCodeRoots, 0, multibyteCodeRoots.Length);
                     }
                     else if (nextCode > 1u << currentCodeSize)
                     {
