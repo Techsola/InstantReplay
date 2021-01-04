@@ -49,7 +49,7 @@ namespace Techsola.InstantReplay
                 var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf<User32.CURSORINFO>() };
                 if (!User32.GetCursorInfo(ref cursorInfo)) throw new Win32Exception();
 
-                var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandles();
+                var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
                 bitmapDC ??= CreateScreenDC();
 
@@ -61,6 +61,7 @@ namespace Techsola.InstantReplay
                         ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
                         : null);
 
+                    var zOrder = 0u;
                     foreach (var window in currentWindows)
                     {
                         if (!User32.IsWindowVisible(window)) continue;
@@ -83,7 +84,8 @@ namespace Techsola.InstantReplay
                         if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
                         if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
 
-                        windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window));
+                        windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder);
+                        zOrder++;
                     }
 
                     foreach (var entry in InfoByWindowHandle.ToList())
@@ -173,19 +175,27 @@ namespace Techsola.InstantReplay
                 var paletteBuffer = new (byte R, byte G, byte B)[256];
                 var indexedImageBuffer = new byte[compositionWidth * compositionHeight];
 
+                var framesToDraw = new List<Frame>();
+
                 for (var i = 0; i < frameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
                     if (!Gdi32.BitBlt(compositionDC, 0, 0, compositionWidth, compositionHeight, IntPtr.Zero, 0, 0, Gdi32.RasterOperation.BLACKNESS))
                         throw new Win32Exception("BitBlt failed.");
 
-                    // TODO: z order
+                    framesToDraw.Clear();
+
                     foreach (var frameList in framesByWindow)
                     {
                         var index = i - frameCount + frameList.Length;
                         if (index < 0) continue;
-                        frameList[index].Compose(bitmapDC, compositionDC, compositionOffset);
+                        framesToDraw.Add(frameList[index]);
                     }
+
+                    framesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
+
+                    foreach (var frame in framesToDraw)
+                        frame.Compose(bitmapDC, compositionDC, compositionOffset);
 
                     if (cursorFrames[i - frameCount + cursorFrames.Length] is { } cursor)
                     {

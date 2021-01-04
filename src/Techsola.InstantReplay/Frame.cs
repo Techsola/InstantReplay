@@ -20,6 +20,7 @@ namespace Techsola.InstantReplay
             public int WindowClientWidth { get; private set; }
             public int WindowClientHeight { get; private set; }
             public uint WindowDpi { get; private set; }
+            public uint ZOrder { get; private set; }
 
             public void Dispose()
             {
@@ -33,7 +34,8 @@ namespace Techsola.InstantReplay
                 int windowClientTop,
                 int windowClientWidth,
                 int windowClientHeight,
-                uint windowDpi)
+                uint windowDpi,
+                uint zOrder)
             {
                 if (windowClientWidth > 0 && windowClientHeight > 0)
                 {
@@ -82,6 +84,7 @@ namespace Techsola.InstantReplay
                 WindowClientWidth = windowClientWidth;
                 WindowClientHeight = windowClientHeight;
                 WindowDpi = windowDpi;
+                ZOrder = zOrder;
             }
 
             public void Compose(Gdi32.DeviceContextSafeHandle bitmapDC, Gdi32.DeviceContextSafeHandle compositionDC, (int X, int Y) compositionOffset)

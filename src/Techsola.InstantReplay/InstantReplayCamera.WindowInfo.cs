@@ -39,10 +39,11 @@ namespace Techsola.InstantReplay
                 int windowClientTop,
                 int windowClientWidth,
                 int windowClientHeight,
-                uint windowDpi)
+                uint windowDpi,
+                uint zOrder)
             {
                 var frame = frames.GetNextRef() ??= new();
-                frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi);
+                frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder);
             }
 
             public Frame[] GetFramesSnapshot() => frames.ToArray();

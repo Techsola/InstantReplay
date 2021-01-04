@@ -35,10 +35,10 @@ namespace Techsola.InstantReplay.Native
         }
 
         /// <summary>
-        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumthreadwindows"/>
+        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows"/>
         /// </summary>
         [DllImport("user32.dll")]
-        public static extern bool EnumThreadWindows(int dwThreadId, WNDENUMPROC lpfn, IntPtr lParam);
+        public static extern bool EnumWindows(WNDENUMPROC lpfn, IntPtr lParam);
 
         /// <summary>
         /// https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms633498(v=vs.85)
@@ -115,6 +115,12 @@ namespace Techsola.InstantReplay.Native
             public IntPtr hbmMask;
             public IntPtr hbmColor;
         }
+
+        /// <summary>
+        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid"/>
+        /// </summary>
+        [DllImport("user32.dll")]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowvisible"/>

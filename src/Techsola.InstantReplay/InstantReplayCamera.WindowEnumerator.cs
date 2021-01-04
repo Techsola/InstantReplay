@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using Techsola.InstantReplay.Native;
 
 namespace Techsola.InstantReplay
@@ -9,23 +8,24 @@ namespace Techsola.InstantReplay
     {
         private sealed class WindowEnumerator
         {
-            private readonly Process process = Process.GetCurrentProcess();
+            private readonly uint currentProcessId;
             private readonly List<IntPtr> list = new();
             private readonly User32.WNDENUMPROC callback;
 
             public WindowEnumerator()
             {
-                callback = EnumThreadWindowsCallback;
+                callback = EnumWindowsCallback;
+
+#if !NETFRAMEWORK
+                currentProcessId = (uint)Environment.ProcessId;
+#else
+                currentProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+#endif
             }
 
-            public IntPtr[] GetCurrentWindowHandles()
+            public IntPtr[] GetCurrentWindowHandlesInZOrder()
             {
-                foreach (ProcessThread thread in process.Threads)
-                {
-                    User32.EnumThreadWindows(thread.Id, callback, lParam: IntPtr.Zero);
-                }
-
-                process.Refresh();
+                User32.EnumWindows(callback, lParam: IntPtr.Zero);
 
                 if (list.Count == 0) return Array.Empty<IntPtr>();
 
@@ -34,9 +34,10 @@ namespace Techsola.InstantReplay
                 return array;
             }
 
-            private bool EnumThreadWindowsCallback(IntPtr hWnd, IntPtr lParam)
+            private bool EnumWindowsCallback(IntPtr hWnd, IntPtr lParam)
             {
-                list.Add(hWnd);
+                _ = User32.GetWindowThreadProcessId(hWnd, out var processId);
+                if (processId == currentProcessId) list.Add(hWnd);
                 return true;
             }
         }
