@@ -12,7 +12,7 @@ namespace Techsola.InstantReplay
 {
     public static partial class InstantReplayCamera
     {
-        private const int SecondsBeforeBitBltingNewWindow = 1;
+        private const int MillisecondsBeforeBitBltingNewWindow = 300;
         private const int FramesPerSecond = 10;
         private const int DurationInSeconds = 10;
         private const int BufferSize = DurationInSeconds * FramesPerSecond;
@@ -76,7 +76,7 @@ namespace Techsola.InstantReplay
                         {
                             windowState.LastSeen = now;
 
-                            if ((now - windowState.FirstSeen) < SecondsBeforeBitBltingNewWindow * Stopwatch.Frequency)
+                            if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
                                 continue;
                         }
 
