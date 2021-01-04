@@ -57,12 +57,12 @@ namespace Techsola.InstantReplay
             }
 
             var i = 0;
-            foreach (var (channel1, channel2, channel3) in sourceImage)
+            foreach (var pixel in sourceImage)
             {
                 indexedImageBuffer[i] = tag[
-                    (channel1 >> ChannelIndexShift) + 1,
-                    (channel2 >> ChannelIndexShift) + 1,
-                    (channel3 >> ChannelIndexShift) + 1];
+                    (((pixel >> 16) & 0xFF) >> ChannelIndexShift) + 1,
+                    (((pixel >> 8) & 0xFF) >> ChannelIndexShift) + 1,
+                    ((pixel & 0xFF) >> ChannelIndexShift) + 1];
                 i++;
             }
         }
@@ -134,17 +134,21 @@ namespace Techsola.InstantReplay
         {
             Array.Clear(moments, 0, moments.Length);
 
-            foreach (var (channel1, channel2, channel3) in sourceImage)
+            foreach (var pixel in sourceImage)
             {
+                var channel1 = (pixel >> 16) & 0xFF;
+                var channel2 = (pixel >> 8) & 0xFF;
+                var channel3 = pixel & 0xFF;
+
                 ref var latticePoint = ref moments[
                     (channel1 >> ChannelIndexShift) + 1,
                     (channel2 >> ChannelIndexShift) + 1,
                     (channel3 >> ChannelIndexShift) + 1];
 
                 latticePoint.Density++;
-                latticePoint.Channel1TimesDensity += channel1;
-                latticePoint.Channel2TimesDensity += channel2;
-                latticePoint.Channel3TimesDensity += channel3;
+                latticePoint.Channel1TimesDensity += (int)channel1;
+                latticePoint.Channel2TimesDensity += (int)channel2;
+                latticePoint.Channel3TimesDensity += (int)channel3;
                 latticePoint.MagnitudeSquaredTimesDensity += (channel1 * channel1) + (channel2 * channel2) + (channel3 * channel3);
             }
         }
