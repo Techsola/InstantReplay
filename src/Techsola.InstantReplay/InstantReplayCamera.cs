@@ -163,23 +163,9 @@ namespace Techsola.InstantReplay
                 if (bitmapDC is not { IsInvalid: false })
                     throw new InvalidOperationException("infoByWindowHandle should be empty if bitmapDC is not valid.");
 
-                using var compositionDC = CreateScreenDC();
-                using var compositionBitmap = Gdi32.CreateDIBSection(compositionDC, new()
-                {
-                    bmiHeader =
-                    {
-                        biSize = Marshal.SizeOf<Gdi32.BITMAPINFOHEADER>(),
-                        biWidth = compositionWidth,
-                        biHeight = -compositionHeight,
-                        biPlanes = 1,
-                        biBitCount = Frame.BitsPerPixel,
-                    },
-                }, Gdi32.DIB.RGB_COLORS, out var compositionPixelDataPointer, hSection: IntPtr.Zero, offset: 0);
+                using var composition = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
 
-                if (Gdi32.SelectObject(compositionDC, compositionBitmap).IsInvalid)
-                    throw new Win32Exception("SelectObject failed.");
-
-                var cursorRenderer = new AnimatedCursorRenderer(compositionDC);
+                var cursorRenderer = new AnimatedCursorRenderer(composition.DeviceContext);
 
                 var writer = new GifWriter(stream);
 
@@ -196,16 +182,6 @@ namespace Techsola.InstantReplay
 
                 var quantizer = new WuQuantizer();
 
-                ColorEnumerable colorEnumerable;
-                unsafe
-                {
-                    colorEnumerable = new(
-                        (byte*)compositionPixelDataPointer,
-                        (uint)compositionWidth,
-                        stride: ((((uint)compositionWidth * 3) + 3) / 4) * 4,
-                        (uint)compositionHeight);
-                }
-
                 var paletteBuffer = new (byte R, byte G, byte B)[256];
                 var indexedImageBuffer = new byte[compositionWidth * compositionHeight];
 
@@ -214,8 +190,7 @@ namespace Techsola.InstantReplay
                 for (var i = 0; i < maxFrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
-                    if (!Gdi32.BitBlt(compositionDC, 0, 0, compositionWidth, compositionHeight, IntPtr.Zero, 0, 0, Gdi32.RasterOperation.BLACKNESS))
-                        throw new Win32Exception("BitBlt failed.");
+                    composition.Clear(0, 0, compositionWidth, compositionHeight);
 
                     framesToDraw.Clear();
 
@@ -229,12 +204,12 @@ namespace Techsola.InstantReplay
                     framesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
 
                     foreach (var frame in framesToDraw)
-                        frame.Compose(bitmapDC, compositionDC, compositionOffset);
+                        frame.Compose(bitmapDC, composition.DeviceContext, compositionOffset);
 
                     if (cursorFrames[i - maxFrameCount + cursorFrames.Length] is { } cursor)
                         cursorRenderer.Render(cursor.CursorHandle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
-                    quantizer.Quantize(colorEnumerable, paletteBuffer, out var paletteLength, indexedImageBuffer);
+                    quantizer.Quantize(composition.Pixels, paletteBuffer, out var paletteLength, indexedImageBuffer);
 
                     var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
 
