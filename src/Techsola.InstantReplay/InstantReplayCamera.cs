@@ -18,9 +18,9 @@ namespace Techsola.InstantReplay
         private const int BufferSize = DurationInSeconds * FramesPerSecond;
 
         private static Timer? timer;
-        private static int isTakingSnapshot;
         private static WindowEnumerator? windowEnumerator;
         private static Gdi32.DeviceContextSafeHandle? bitmapDC;
+        private static readonly ReaderWriterLockSlim FrameLock = new();
         private static readonly Dictionary<IntPtr, WindowState> InfoByWindowHandle = new();
         private static readonly CircularBuffer<(int X, int Y, IntPtr CursorHandle)?> CursorFrames = new(BufferSize);
 
@@ -43,7 +43,7 @@ namespace Techsola.InstantReplay
 
         private static void AddFrames(object? state)
         {
-            if (Interlocked.Exchange(ref isTakingSnapshot, 1) != 0) return;
+            if (!FrameLock.TryEnterWriteLock(TimeSpan.Zero)) return;
             try
             {
                 var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf<User32.CURSORINFO>() };
@@ -114,7 +114,7 @@ namespace Techsola.InstantReplay
             }
             finally
             {
-                Volatile.Write(ref isTakingSnapshot, 0);
+                FrameLock.ExitWriteLock();
             }
         }
 
@@ -127,7 +127,8 @@ namespace Techsola.InstantReplay
 
         public static void SaveGif(Stream stream)
         {
-            lock (InfoByWindowHandle)
+            FrameLock.EnterReadLock();
+            try
             {
                 var cursorFrames = CursorFrames.ToArray();
 
@@ -258,6 +259,10 @@ namespace Techsola.InstantReplay
                 }
 
                 writer.EndStream();
+            }
+            finally
+            {
+                FrameLock.ExitReadLock();
             }
         }
 

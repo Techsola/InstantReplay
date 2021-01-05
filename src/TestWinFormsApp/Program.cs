@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Techsola.InstantReplay;
 
@@ -52,14 +53,17 @@ namespace TestWinFormsApp
 
         private static void Save()
         {
-            var directoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Techsola.InstantReplay");
+            Task.Run(() =>
+            {
+                var directoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Techsola.InstantReplay");
 
-            Directory.CreateDirectory(directoryPath);
+                Directory.CreateDirectory(directoryPath);
 
-            var fileName = $"{DateTime.Now:yyyy-MM-dd HH.mm.ss}.gif";
-            using var stream = File.Create(Path.Combine(directoryPath, fileName));
+                var fileName = $"{DateTime.Now:yyyy-MM-dd HH.mm.ss}.gif";
+                using var stream = File.Create(Path.Combine(directoryPath, fileName));
 
-            InstantReplayCamera.SaveGif(stream);
+                InstantReplayCamera.SaveGif(stream);
+            });
         }
 
         private static Button CreateButton(string text, Action onClick)
