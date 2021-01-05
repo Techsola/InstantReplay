@@ -130,8 +130,6 @@ namespace Techsola.InstantReplay
             lock (InfoByWindowHandle)
             {
                 var cursorFrames = CursorFrames.ToArray();
-                var cursorHotspotByHandle = new Dictionary<IntPtr, (uint X, uint Y)>();
-                var cursorAnimationStepByHandle = new Dictionary<IntPtr, (uint Current, uint Max)>();
 
                 var framesByWindow = InfoByWindowHandle.Values.Select(i => i.GetFramesSnapshot()).ToList();
 
@@ -179,6 +177,8 @@ namespace Techsola.InstantReplay
 
                 if (Gdi32.SelectObject(compositionDC, compositionBitmap).IsInvalid)
                     throw new Win32Exception("SelectObject failed.");
+
+                var cursorRenderer = new AnimatedCursorRenderer(compositionDC);
 
                 var writer = new GifWriter(stream);
 
@@ -231,45 +231,7 @@ namespace Techsola.InstantReplay
                         frame.Compose(bitmapDC, compositionDC, compositionOffset);
 
                     if (cursorFrames[i - maxFrameCount + cursorFrames.Length] is { } cursor)
-                    {
-                        if (!cursorHotspotByHandle.TryGetValue(cursor.CursorHandle, out var cursorHotspot))
-                        {
-                            if (!User32.GetIconInfo(cursor.CursorHandle, out var iconInfo)) throw new Win32Exception();
-                            new Gdi32.BitmapSafeHandle(iconInfo.hbmMask).Dispose();
-                            new Gdi32.BitmapSafeHandle(iconInfo.hbmColor).Dispose();
-
-                            cursorHotspot = (iconInfo.xHotspot, iconInfo.yHotspot);
-                            cursorHotspotByHandle.Add(cursor.CursorHandle, cursorHotspot);
-                        }
-
-                        if (!cursorAnimationStepByHandle.TryGetValue(cursor.CursorHandle, out var cursorAnimationStep))
-                            cursorAnimationStep = (Current: 0, Max: uint.MaxValue);
-
-                        while (!User32.DrawIconEx(
-                            compositionDC,
-                            compositionOffset.X + cursor.X - (int)cursorHotspot.X,
-                            compositionOffset.Y + cursor.Y - (int)cursorHotspot.Y,
-                            cursor.CursorHandle,
-                            cxWidth: 0,
-                            cyWidth: 0,
-                            cursorAnimationStep.Current,
-                            hbrFlickerFreeDraw: IntPtr.Zero,
-                            User32.DI.NORMAL))
-                        {
-                            var lastError = Marshal.GetLastWin32Error();
-
-                            if ((ERROR)lastError == ERROR.INVALID_PARAMETER && cursorAnimationStep.Current > 0)
-                            {
-                                cursorAnimationStep = (Current: 0, Max: cursorAnimationStep.Current - 1);
-                                continue;
-                            }
-
-                            throw new Win32Exception(lastError);
-                        }
-
-                        cursorAnimationStep.Current = cursorAnimationStep.Current == cursorAnimationStep.Max ? 0 : cursorAnimationStep.Current + 1;
-                        cursorAnimationStepByHandle[cursor.CursorHandle] = cursorAnimationStep;
-                    }
+                        cursorRenderer.Render(cursor.CursorHandle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
                     quantizer.Quantize(colorEnumerable, paletteBuffer, out var paletteLength, indexedImageBuffer);
 
