@@ -13,6 +13,10 @@ namespace Techsola.InstantReplay
             array = new T?[capacity];
         }
 
+        public int Capacity => array.Length;
+
+        public int Count => didWrap ? array.Length : nextIndex;
+
         public ref T? GetNextRef()
         {
             ref var itemRef = ref array[nextIndex];

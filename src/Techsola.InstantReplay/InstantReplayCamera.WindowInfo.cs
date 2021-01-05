@@ -8,8 +8,9 @@ namespace Techsola.InstantReplay
     {
         private sealed class WindowState : IDisposable
         {
-            private readonly Gdi32.DeviceContextSafeHandle windowDC;
-            private readonly CircularBuffer<Frame> frames;
+            private Gdi32.DeviceContextSafeHandle? windowDC;
+            private readonly CircularBuffer<Frame?> frames;
+            private int disposedFrameCount;
 
             public long FirstSeen { get; }
             public long LastSeen { get; set; }
@@ -30,7 +31,7 @@ namespace Techsola.InstantReplay
                 foreach (var frame in frames.GetRawBuffer())
                     frame?.Dispose();
 
-                windowDC.Dispose();
+                windowDC?.Dispose();
             }
 
             public void AddFrame(
@@ -42,11 +43,36 @@ namespace Techsola.InstantReplay
                 uint windowDpi,
                 uint zOrder)
             {
+                if (windowDC is null) throw new InvalidOperationException("The window is closed.");
+
                 var frame = frames.GetNextRef() ??= new();
                 frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder);
             }
 
-            public Frame[] GetFramesSnapshot() => frames.ToArray();
+            public void MarkClosed()
+            {
+                if (windowDC is null) return;
+                windowDC.Dispose();
+                windowDC = null;
+            }
+
+            public void DisposeNextFrame(out bool allFramesDisposed)
+            {
+                if (frames.Count == 0)
+                {
+                    allFramesDisposed = true;
+                    return;
+                }
+
+                ref var frameRef = ref frames.GetNextRef();
+                frameRef?.Dispose();
+                frameRef = null;
+
+                disposedFrameCount++;
+                allFramesDisposed = disposedFrameCount >= frames.Capacity;
+            }
+
+            public Frame?[] GetFramesSnapshot() => frames.ToArray();
         }
     }
 }

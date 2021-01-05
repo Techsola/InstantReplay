@@ -64,12 +64,13 @@ namespace Techsola.InstantReplay
                     var zOrder = 0u;
                     foreach (var window in currentWindows)
                     {
-                        if (!User32.IsWindowVisible(window)) continue;
-
                         if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
                         {
-                            windowState = new(window, firstSeen: now, BufferSize);
-                            InfoByWindowHandle.Add(window, windowState);
+                            if (User32.IsWindowVisible(window))
+                            {
+                                windowState = new(window, firstSeen: now, BufferSize);
+                                InfoByWindowHandle.Add(window, windowState);
+                            }
                             continue;
                         }
                         else
@@ -80,6 +81,8 @@ namespace Techsola.InstantReplay
                                 continue;
                         }
 
+                        if (!User32.IsWindowVisible(window)) continue;
+
                         var clientTopLeft = default(POINT);
                         if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
                         if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
@@ -88,15 +91,25 @@ namespace Techsola.InstantReplay
                         zOrder++;
                     }
 
-                    foreach (var entry in InfoByWindowHandle.ToList())
+                    var closedWindowsWithNoFrames = new List<IntPtr>();
+
+                    foreach (var entry in InfoByWindowHandle)
                     {
                         if (entry.Value.LastSeen != now)
                         {
-                            // TODO: Still keep around for ten seconds even though the window is gone
-                            InfoByWindowHandle.Remove(entry.Key);
-                            entry.Value.Dispose();
+                            entry.Value.MarkClosed();
+                            entry.Value.DisposeNextFrame(out var allFramesDisposed);
+
+                            if (allFramesDisposed)
+                            {
+                                entry.Value.Dispose();
+                                closedWindowsWithNoFrames.Add(entry.Key);
+                            }
                         }
                     }
+
+                    foreach (var window in closedWindowsWithNoFrames)
+                        InfoByWindowHandle.Remove(window);
                 }
             }
             finally
@@ -121,12 +134,32 @@ namespace Techsola.InstantReplay
                 var cursorAnimationStepByHandle = new Dictionary<IntPtr, (uint Current, uint Max)>();
 
                 var framesByWindow = InfoByWindowHandle.Values.Select(i => i.GetFramesSnapshot()).ToList();
-                var frameCount = framesByWindow.Max(frames => frames.Length);
 
-                var allFrames = framesByWindow.SelectMany(frames => frames);
-                var compositionOffset = (X: -allFrames.Min(f => f.WindowClientLeft), Y: -allFrames.Min(f => f.WindowClientTop));
-                var compositionWidth = allFrames.Max(f => f.WindowClientLeft + f.WindowClientWidth) + compositionOffset.X;
-                var compositionHeight = allFrames.Max(f => f.WindowClientTop + f.WindowClientHeight) + compositionOffset.Y;
+                var minLeft = int.MaxValue;
+                var maxRight = int.MinValue;
+                var minTop = int.MaxValue;
+                var maxBottom = int.MinValue;
+                var maxFrameCount = 0;
+
+                foreach (var frameList in framesByWindow)
+                {
+                    for (var i = 0; i < frameList.Length; i++)
+                    {
+                        if (frameList[i] is not { } frame) continue;
+
+                        var frameCount = frameList.Length - i;
+                        if (maxFrameCount < frameCount) maxFrameCount = frameCount;
+
+                        if (minLeft > frame.WindowClientLeft) minLeft = frame.WindowClientLeft;
+                        if (minTop > frame.WindowClientTop) minTop = frame.WindowClientTop;
+                        if (maxRight < frame.WindowClientLeft + frame.WindowClientWidth) maxRight = frame.WindowClientLeft + frame.WindowClientWidth;
+                        if (maxBottom < frame.WindowClientTop + frame.WindowClientHeight) maxBottom = frame.WindowClientTop + frame.WindowClientHeight;
+                    }
+                }
+
+                var compositionOffset = (X: -minLeft, Y: -minTop);
+                var compositionWidth = maxRight - minLeft;
+                var compositionHeight = maxBottom - minTop;
 
                 if (bitmapDC is not { IsInvalid: false })
                     throw new InvalidOperationException("infoByWindowHandle should be empty if bitmapDC is not valid.");
@@ -177,7 +210,7 @@ namespace Techsola.InstantReplay
 
                 var framesToDraw = new List<Frame>();
 
-                for (var i = 0; i < frameCount; i++)
+                for (var i = 0; i < maxFrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
                     if (!Gdi32.BitBlt(compositionDC, 0, 0, compositionWidth, compositionHeight, IntPtr.Zero, 0, 0, Gdi32.RasterOperation.BLACKNESS))
@@ -187,9 +220,9 @@ namespace Techsola.InstantReplay
 
                     foreach (var frameList in framesByWindow)
                     {
-                        var index = i - frameCount + frameList.Length;
-                        if (index < 0) continue;
-                        framesToDraw.Add(frameList[index]);
+                        var index = i - maxFrameCount + frameList.Length;
+                        if (index >= 0 && frameList[index] is { } frame)
+                            framesToDraw.Add(frame);
                     }
 
                     framesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
@@ -197,7 +230,7 @@ namespace Techsola.InstantReplay
                     foreach (var frame in framesToDraw)
                         frame.Compose(bitmapDC, compositionDC, compositionOffset);
 
-                    if (cursorFrames[i - frameCount + cursorFrames.Length] is { } cursor)
+                    if (cursorFrames[i - maxFrameCount + cursorFrames.Length] is { } cursor)
                     {
                         if (!cursorHotspotByHandle.TryGetValue(cursor.CursorHandle, out var cursorHotspot))
                         {
@@ -242,7 +275,7 @@ namespace Techsola.InstantReplay
 
                     var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
 
-                    var isLastFrame = i == frameCount - 1;
+                    var isLastFrame = i == maxFrameCount - 1;
 
                     writer.WriteGraphicControlExtensionBlock(
                         delayInHundredthsOfASecond: isLastFrame ? 400 : 10,
