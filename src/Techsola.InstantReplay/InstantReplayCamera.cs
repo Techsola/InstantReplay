@@ -6,10 +6,21 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Techsola.InstantReplay.Native;
 
 namespace Techsola.InstantReplay
 {
+    /// <summary>
+    /// <para>
+    /// Buffers timed screenshots for all windows in the current process and tracks the mouse cursor so that an animated
+    /// GIF can be created on demand, for inclusion in a crash report for example.
+    /// </para>
+    /// <para>
+    /// Call <see cref="Start"/> once when the application starts, and then call <see cref="SaveGif"/> to obtain a GIF
+    /// of the last ten seconds up to that point in time.
+    /// </para>
+    /// </summary>
     public static partial class InstantReplayCamera
     {
         private const int MillisecondsBeforeBitBltingNewWindow = 300;
@@ -24,6 +35,20 @@ namespace Techsola.InstantReplay
         private static readonly Dictionary<IntPtr, WindowState> InfoByWindowHandle = new();
         private static readonly CircularBuffer<(int X, int Y, IntPtr CursorHandle)?> CursorFrames = new(BufferSize);
 
+        /// <summary>
+        /// <para>
+        /// Begins buffering up to ten seconds of screenshots for all windows in the current process, including windows
+        /// that have not been created yet, as well as the mouse cursor.
+        /// </para>
+        /// <para>
+        /// Call this during the start of your application. <see cref="SaveGif"/> will only have access to frames that
+        /// occurred after this call. Subsequent calls to this method have no effect.
+        /// </para>
+        /// <para>
+        /// This method is thread-safe and does not behave differently when called from the UI thread or any other
+        /// thread.
+        /// </para>
+        /// </summary>
         public static void Start()
         {
             if (Volatile.Read(ref timer) is not null) return;
@@ -125,6 +150,24 @@ namespace Techsola.InstantReplay
             return dc;
         }
 
+        /// <summary>
+        /// <para>
+        /// Blocks while synchronously compositing, quantizing, and encoding all buffered screenshots and cursor
+        /// movements and writing them to the specified stream. No frames are erased by this call, and no new frames are
+        /// buffered while this method is executing.
+        /// </para>
+        /// <para>
+        /// ⚠ Consider using <see cref="Task.Run(Action)"/> to prevent the CPU-intensive quantizing and encoding from
+        /// making the application unresponsive. An even stronger reason to consider this is if <paramref
+        /// name="stream"/> does I/O-bound work. I/O can be unexpectedly delayed for a number of situations that may
+        /// never come up while testing, and any I/O delay makes the app unresponsive for longer if this method is
+        /// called from the UI thread.
+        /// </para>
+        /// <para>
+        /// This method is thread-safe and does not behave differently when called from the UI thread or any other
+        /// thread.
+        /// </para>
+        /// </summary>
         public static void SaveGif(Stream stream)
         {
             FrameLock.EnterReadLock();
