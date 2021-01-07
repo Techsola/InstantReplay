@@ -4,6 +4,8 @@
     <TargetFrameworks>net48;net5.0-windows</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\Techsola.InstantReplay.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>
