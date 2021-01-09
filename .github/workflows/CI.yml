@@ -18,7 +18,7 @@ jobs:
 
     - name: Publish to MyGet
       if: github.ref == 'refs/heads/main'
-      run: dotnet nuget push artifacts/Packages/Techsola.InstantReplay.nupkg --symbol-source https://www.myget.org/F/techsola/api/v3/index.json --api-key ${{ secrets.MYGET_API_KEY }}
+      run: dotnet nuget push artifacts\Packages\Techsola.InstantReplay.*.nupkg --source https://www.myget.org/F/techsola/api/v3/index.json --api-key ${{ secrets.MYGET_API_KEY }}
 
     - name: Upload packages artifact
       if: always()
