@@ -6,6 +6,19 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Techsola.InstantReplay.snk</AssemblyOriginatorKeyFile>
+
+    <Version>1.0.0</Version>
+    <Authors>Technology Solutions Associates</Authors>
+    <Copyright>Copyright © 2020–2021 Technology Solutions Associates</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Techsola/InstantReplay</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Techsola/InstantReplay</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>animated GIF capture screenshot record windows desktop application UI diagnostic error crash report</PackageTags>
+    <Description>Produces a GIF on demand of the last ten seconds of a Windows desktop app’s user interface. Useful for error reports.</Description>
+    <EmbedAllSources>true</EmbedAllSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
