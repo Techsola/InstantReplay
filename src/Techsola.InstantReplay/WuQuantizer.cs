@@ -27,7 +27,7 @@ namespace Techsola.InstantReplay
         public void Quantize(
             ColorEnumerable sourceImage,
             (byte R, byte G, byte B)[] paletteBuffer,
-            out int paletteLength,
+            out uint paletteLength,
             byte[] indexedImageBuffer)
         {
             if (paletteBuffer.Length != MaxColorCount)
@@ -66,9 +66,9 @@ namespace Techsola.InstantReplay
             }
         }
 
-        private void OutputPalette(Box[] cubes, (byte R, byte G, byte B)[] paletteBuffer, out int paletteLength)
+        private void OutputPalette(Box[] cubes, (byte R, byte G, byte B)[] paletteBuffer, out uint paletteLength)
         {
-            paletteLength = cubes.Length;
+            paletteLength = (uint)cubes.Length;
 
             for (var i = 0; i < cubes.Length; i++)
             {

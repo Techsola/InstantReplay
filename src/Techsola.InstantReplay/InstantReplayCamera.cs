@@ -284,11 +284,12 @@ namespace Techsola.InstantReplay
             }
         }
 
-        private static byte GetBitsPerPixel(int paletteLength)
+        private static byte GetBitsPerPixel(uint paletteLength)
         {
             if (paletteLength > 256)
                 throw new ArgumentOutOfRangeException(nameof(paletteLength), paletteLength, "Palette length must be no greater than 256.");
 
+#if NETFRAMEWORK
             // Distribution is expected to be heavily weighted towards large palettes
             if (paletteLength > 128) return 8;
             if (paletteLength > 64) return 7;
@@ -298,6 +299,10 @@ namespace Techsola.InstantReplay
             if (paletteLength > 4) return 3;
             if (paletteLength > 2) return 2;
             return 1;
+#else
+            return paletteLength <= 2 ? 1 :
+                (byte)((sizeof(uint) * 8) - System.Numerics.BitOperations.LeadingZeroCount(paletteLength - 1));
+#endif
         }
     }
 }
