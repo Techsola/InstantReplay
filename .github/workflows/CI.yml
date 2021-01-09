@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+
+jobs:
+  CI:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build
+      run: ./build.ps1
+
+    - name: Publish to MyGet
+      if: github.ref == 'refs/heads/main'
+      run: dotnet nuget push artifacts/Packages/Techsola.InstantReplay.nupkg --symbol-source https://www.myget.org/F/techsola/api/v3/index.json --api-key ${{ secrets.MYGET_API_KEY }}
+
+    - name: Upload packages artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: Packages
+        path: artifacts/Packages
+
+    - name: Upload logs artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: Logs
+        path: artifacts/Logs
