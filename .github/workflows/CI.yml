@@ -21,12 +21,14 @@ jobs:
       run: dotnet nuget push artifacts/Packages/Techsola.InstantReplay.nupkg --symbol-source https://www.myget.org/F/techsola/api/v3/index.json --api-key ${{ secrets.MYGET_API_KEY }}
 
     - name: Upload packages artifact
+      if: always()
       uses: actions/upload-artifact@v2
       with:
         name: Packages
         path: artifacts/Packages
 
     - name: Upload logs artifact
+      if: always()
       uses: actions/upload-artifact@v2
       with:
         name: Logs
