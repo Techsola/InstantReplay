@@ -3,10 +3,9 @@ using System.Collections.Generic;
 
 namespace Techsola.InstantReplay
 {
-    // TODO: Implement WSM-WU from https://arxiv.org/pdf/1101.0395.pdf. (Run Wu's algorithm to initialize cluster
-    // centers, then run the Weighted Sort-Means algorithm.)
-
-    // Also consider converting the color space from RGB to CIELAB to do the quantizing, then back.
+    // If the need arises to improve the chosen palette further, investigate the WSM-WU method as detailed in
+    // https://arxiv.org/pdf/1101.0395.pdf. (Run Wu's algorithm to initialize cluster centers, then run the Weighted
+    // Sort-Means algorithm.) Also consider quantizing in CIELAB color space instead of RGB.
 
     /// <summary>
     /// Implements <see href="https://www.ece.mcmaster.ca/~xwu/cq.c"/> by Xiaolin Wu.
