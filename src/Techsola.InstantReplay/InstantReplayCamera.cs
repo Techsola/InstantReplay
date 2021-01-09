@@ -76,7 +76,7 @@ namespace Techsola.InstantReplay
 
                 var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
-                bitmapDC ??= CreateScreenDC();
+                bitmapDC ??= Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
 
                 var now = Stopwatch.GetTimestamp();
 
@@ -141,13 +141,6 @@ namespace Techsola.InstantReplay
             {
                 FrameLock.ExitWriteLock();
             }
-        }
-
-        private static Gdi32.DeviceContextSafeHandle CreateScreenDC()
-        {
-            var dc = Gdi32.CreateCompatibleDC(IntPtr.Zero);
-            if (dc.IsInvalid) throw new Win32Exception("CreateCompatibleDC failed.");
-            return dc;
         }
 
         /// <summary>

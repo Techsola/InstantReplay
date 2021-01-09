@@ -15,8 +15,7 @@ namespace Techsola.InstantReplay
 
         public Composition(int width, int height, ushort bitsPerPixel)
         {
-            DeviceContext = Gdi32.CreateCompatibleDC(IntPtr.Zero);
-            if (DeviceContext.IsInvalid) throw new Win32Exception("CreateCompatibleDC failed.");
+            DeviceContext = Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
 
             bitmap = Gdi32.CreateDIBSection(DeviceContext, new()
             {
@@ -28,12 +27,9 @@ namespace Techsola.InstantReplay
                     biPlanes = 1,
                     biBitCount = bitsPerPixel,
                 },
-            }, Gdi32.DIB.RGB_COLORS, out var compositionPixelDataPointer, hSection: IntPtr.Zero, offset: 0);
+            }, Gdi32.DIB.RGB_COLORS, out var compositionPixelDataPointer, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
 
-            if (bitmap.IsInvalid) throw new Win32Exception();
-
-            if (Gdi32.SelectObject(DeviceContext, bitmap).IsInvalid)
-                throw new Win32Exception("SelectObject failed.");
+            Gdi32.SelectObject(DeviceContext, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
             unsafe
             {

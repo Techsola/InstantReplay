@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using Techsola.InstantReplay.Native;
 
 namespace Techsola.InstantReplay
@@ -20,8 +19,7 @@ namespace Techsola.InstantReplay
                 FirstSeen = firstSeen;
                 LastSeen = firstSeen;
 
-                windowDC = User32.GetDC(handle);
-                if (windowDC.IsInvalid) throw new Win32Exception("GetDC failed.");
+                windowDC = User32.GetDC(handle).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
 
                 frames = new(bufferSize);
             }

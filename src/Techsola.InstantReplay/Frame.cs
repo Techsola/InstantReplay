@@ -67,13 +67,10 @@ namespace Techsola.InstantReplay
                                 biPlanes = 1,
                                 biBitCount = BitsPerPixel,
                             },
-                        }, Gdi32.DIB.RGB_COLORS, ppvBits: out _, hSection: IntPtr.Zero, offset: 0);
-
-                        if (bitmap.IsInvalid) throw new Win32Exception();
+                        }, Gdi32.DIB.RGB_COLORS, ppvBits: out _, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
                     }
 
-                    if (Gdi32.SelectObject(bitmapDC, bitmap).IsInvalid)
-                        throw new Win32Exception("SelectObject failed.");
+                    Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
                     if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowClientWidth, windowClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
                         throw new Win32Exception();
@@ -91,8 +88,7 @@ namespace Techsola.InstantReplay
             {
                 if (bitmap is null) return;
 
-                if (Gdi32.SelectObject(bitmapDC, bitmap).IsInvalid)
-                    throw new Win32Exception("SelectObject failed.");
+                Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
                 if (!Gdi32.BitBlt(
                     compositionDC,
