@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Threading.Tasks;
 using Techsola.InstantReplay.Native;
 
 namespace Techsola.InstantReplay
@@ -51,7 +50,11 @@ namespace Techsola.InstantReplay
         /// </summary>
         public static void Start()
         {
+#if !NET35
             if (Volatile.Read(ref timer) is not null) return;
+#else
+            if (timer is not null) return;
+#endif
 
             var newTimer = new Timer(AddFrames);
 
@@ -71,7 +74,7 @@ namespace Techsola.InstantReplay
             if (!FrameLock.TryEnterWriteLock(TimeSpan.Zero)) return;
             try
             {
-                var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf<User32.CURSORINFO>() };
+                var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
                 if (!User32.GetCursorInfo(ref cursorInfo)) throw new Win32Exception();
 
                 var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
@@ -143,6 +146,7 @@ namespace Techsola.InstantReplay
             }
         }
 
+#if !NET35
         /// <summary>
         /// <para>
         /// Blocks while synchronously compositing, quantizing, and encoding all buffered screenshots and cursor
@@ -150,7 +154,7 @@ namespace Techsola.InstantReplay
         /// buffered while this method is executing.
         /// </para>
         /// <para>
-        /// ⚠ Consider using <see cref="Task.Run(Action)"/> to prevent the CPU-intensive quantizing and encoding from
+        /// ⚠ Consider using <see cref="System.Threading.Tasks.Task.Run(Action)"/> to prevent the CPU-intensive quantizing and encoding from
         /// making the application unresponsive. An even stronger reason to consider this is if <paramref
         /// name="stream"/> does I/O-bound work. I/O can be unexpectedly delayed for a number of situations that may
         /// never come up while testing, and any I/O delay makes the app unresponsive for longer if this method is
@@ -161,6 +165,19 @@ namespace Techsola.InstantReplay
         /// thread.
         /// </para>
         /// </summary>
+#else
+        /// <summary>
+        /// <para>
+        /// Blocks while synchronously compositing, quantizing, and encoding all buffered screenshots and cursor
+        /// movements and writing them to the specified stream. No frames are erased by this call, and no new frames are
+        /// buffered while this method is executing.
+        /// </para>
+        /// <para>
+        /// This method is thread-safe and does not behave differently when called from the UI thread or any other
+        /// thread.
+        /// </para>
+        /// </summary>
+#endif
         public static void SaveGif(Stream stream)
         {
             FrameLock.EnterReadLock();

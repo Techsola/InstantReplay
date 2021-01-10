@@ -27,7 +27,9 @@ namespace Techsola.InstantReplay
             {
                 User32.EnumWindows(callback, lParam: IntPtr.Zero);
 
+#if !NET35
                 if (list.Count == 0) return Array.Empty<IntPtr>();
+#endif
 
                 var array = list.ToArray();
                 list.Clear();

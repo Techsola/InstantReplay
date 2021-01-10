@@ -13,7 +13,12 @@ namespace Techsola.InstantReplay
 
         public GifWriter(Stream stream)
         {
+#if !NET35
             writer = new(stream, Encoding.ASCII, leaveOpen: true);
+#else
+            writer = new(stream, Encoding.ASCII);
+            GC.SuppressFinalize(writer);
+#endif
         }
 
         private static readonly byte[] HeaderSignatureAndVersion =

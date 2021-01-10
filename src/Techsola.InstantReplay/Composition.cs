@@ -21,7 +21,7 @@ namespace Techsola.InstantReplay
             {
                 bmiHeader =
                 {
-                    biSize = Marshal.SizeOf<Gdi32.BITMAPINFOHEADER>(),
+                    biSize = Marshal.SizeOf(typeof(Gdi32.BITMAPINFOHEADER)),
                     biWidth = width,
                     biHeight = -height,
                     biPlanes = 1,
