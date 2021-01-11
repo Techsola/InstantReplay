@@ -12,6 +12,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # Needed in order for tags to be available so prereleases autoincrement the version
 
     - name: Build
       run: ./build.ps1
