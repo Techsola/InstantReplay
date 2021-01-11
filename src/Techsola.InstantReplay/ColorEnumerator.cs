@@ -17,13 +17,13 @@ namespace Techsola.InstantReplay
             imageEnd = start + (height * stride) - strideSkip;
         }
 
-        public uint Current
+        public Color Current
         {
             get
             {
                 unsafe
                 {
-                    return *(uint*)next;
+                    return *(Color*)next;
                 }
             }
         }

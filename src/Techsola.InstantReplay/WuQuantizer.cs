@@ -59,9 +59,9 @@ namespace Techsola.InstantReplay
             foreach (var pixel in sourceImage)
             {
                 indexedImageBuffer[i] = tag[
-                    (((pixel >> 16) & 0xFF) >> ChannelIndexShift) + 1,
-                    (((pixel >> 8) & 0xFF) >> ChannelIndexShift) + 1,
-                    ((pixel & 0xFF) >> ChannelIndexShift) + 1];
+                    (pixel.Channel1 >> ChannelIndexShift) + 1,
+                    (pixel.Channel2 >> ChannelIndexShift) + 1,
+                    (pixel.Channel3 >> ChannelIndexShift) + 1];
                 i++;
             }
         }
@@ -135,20 +135,16 @@ namespace Techsola.InstantReplay
 
             foreach (var pixel in sourceImage)
             {
-                var channel1 = (pixel >> 16) & 0xFF;
-                var channel2 = (pixel >> 8) & 0xFF;
-                var channel3 = pixel & 0xFF;
-
                 ref var latticePoint = ref moments[
-                    (channel1 >> ChannelIndexShift) + 1,
-                    (channel2 >> ChannelIndexShift) + 1,
-                    (channel3 >> ChannelIndexShift) + 1];
+                    (pixel.Channel1 >> ChannelIndexShift) + 1,
+                    (pixel.Channel2 >> ChannelIndexShift) + 1,
+                    (pixel.Channel3 >> ChannelIndexShift) + 1];
 
                 latticePoint.Density++;
-                latticePoint.Channel1TimesDensity += (int)channel1;
-                latticePoint.Channel2TimesDensity += (int)channel2;
-                latticePoint.Channel3TimesDensity += (int)channel3;
-                latticePoint.MagnitudeSquaredTimesDensity += (channel1 * channel1) + (channel2 * channel2) + (channel3 * channel3);
+                latticePoint.Channel1TimesDensity += pixel.Channel1;
+                latticePoint.Channel2TimesDensity += pixel.Channel2;
+                latticePoint.Channel3TimesDensity += pixel.Channel3;
+                latticePoint.MagnitudeSquaredTimesDensity += (pixel.Channel1 * pixel.Channel1) + (pixel.Channel2 * pixel.Channel2) + (pixel.Channel3 * pixel.Channel3);
             }
         }
 
