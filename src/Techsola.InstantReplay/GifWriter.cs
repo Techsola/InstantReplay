@@ -13,6 +13,8 @@ namespace Techsola.InstantReplay
 
         public GifWriter(Stream stream)
         {
+            // BinaryWriter does not have its own buffer to flush and does not do anything when disposed other than
+            // dispose the stream if leaveOpen is false and flush the stream if leaveOpen is true.
 #if !NET35
             writer = new(stream, Encoding.ASCII, leaveOpen: true);
 #else
