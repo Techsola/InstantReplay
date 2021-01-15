@@ -19,7 +19,6 @@ namespace Techsola.InstantReplay
             writer = new(stream, Encoding.ASCII, leaveOpen: true);
 #else
             writer = new(stream, Encoding.ASCII);
-            GC.SuppressFinalize(writer);
 #endif
         }
 
