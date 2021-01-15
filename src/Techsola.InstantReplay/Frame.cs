@@ -84,9 +84,16 @@ namespace Techsola.InstantReplay
                 ZOrder = zOrder;
             }
 
+            public void SetInvisible()
+            {
+                WindowClientWidth = 0;
+                WindowClientHeight = 0;
+            }
+
             public void Compose(Gdi32.DeviceContextSafeHandle bitmapDC, Gdi32.DeviceContextSafeHandle compositionDC, (int X, int Y) compositionOffset)
             {
-                if (bitmap is null) return;
+                if (bitmap is null || WindowClientWidth == 0 || WindowClientHeight == 0)
+                    return;
 
                 Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
