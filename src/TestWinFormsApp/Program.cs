@@ -29,6 +29,10 @@ namespace TestWinFormsApp
                         {
                             CreateButton("File dialog on new thread", ShowDialogOnNewThread),
                             CreateButton("Save current GIF to desktop", Save),
+                            new ComboBox
+                            {
+                                Items = { "A", "B", "C", "D", "E", "F", "G" },
+                            },
                         },
                     },
                 },
