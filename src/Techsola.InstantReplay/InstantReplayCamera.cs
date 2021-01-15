@@ -32,7 +32,7 @@ namespace Techsola.InstantReplay
         private static Gdi32.DeviceContextSafeHandle? bitmapDC;
         private static readonly ReaderWriterLockSlim FrameLock = new();
         private static readonly Dictionary<IntPtr, WindowState> InfoByWindowHandle = new();
-        private static readonly CircularBuffer<(int X, int Y, IntPtr CursorHandle)?> CursorFrames = new(BufferSize);
+        private static readonly CircularBuffer<(long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)> Frames = new(BufferSize);
 
         /// <summary>
         /// <para>
@@ -55,7 +55,6 @@ namespace Techsola.InstantReplay
 #else
             if (timer is not null) return;
 #endif
-
             var newTimer = new Timer(AddFrames);
 
             if (Interlocked.CompareExchange(ref timer, newTimer, null) is not null)
@@ -85,9 +84,11 @@ namespace Techsola.InstantReplay
 
                 lock (InfoByWindowHandle)
                 {
-                    CursorFrames.Add((cursorInfo.flags & (User32.CURSOR.SHOWING | User32.CURSOR.SUPPRESSED)) == User32.CURSOR.SHOWING
-                        ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
-                        : null);
+                    Frames.Add((
+                        Timestamp: now,
+                        Cursor: (cursorInfo.flags & (User32.CURSOR.SHOWING | User32.CURSOR.SUPPRESSED)) == User32.CURSOR.SHOWING
+                            ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
+                            : null));
 
                     var zOrder = 0u;
                     foreach (var window in currentWindows)
@@ -183,7 +184,7 @@ namespace Techsola.InstantReplay
             FrameLock.EnterReadLock();
             try
             {
-                var cursorFrames = CursorFrames.ToArray();
+                var frames = Frames.ToArray();
 
                 var framesByWindow = InfoByWindowHandle.Values.Select(i => i.GetFramesSnapshot()).ToList();
 
@@ -238,39 +239,50 @@ namespace Techsola.InstantReplay
                 var paletteBuffer = new (byte R, byte G, byte B)[256];
                 var indexedImageBuffer = new byte[compositionWidth * compositionHeight];
 
-                var framesToDraw = new List<Frame>();
+                var windowFramesToDraw = new List<Frame>();
 
                 for (var i = 0; i < maxFrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
                     composition.Clear(0, 0, compositionWidth, compositionHeight);
 
-                    framesToDraw.Clear();
+                    windowFramesToDraw.Clear();
 
                     foreach (var frameList in framesByWindow)
                     {
                         var index = i - maxFrameCount + frameList.Length;
-                        if (index >= 0 && frameList[index] is { } frame)
-                            framesToDraw.Add(frame);
+                        if (index >= 0 && frameList[index] is { } windowFrame)
+                            windowFramesToDraw.Add(windowFrame);
                     }
 
-                    framesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
+                    windowFramesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
 
-                    foreach (var frame in framesToDraw)
-                        frame.Compose(bitmapDC, composition.DeviceContext, compositionOffset);
+                    foreach (var windowFrame in windowFramesToDraw)
+                        windowFrame.Compose(bitmapDC, composition.DeviceContext, compositionOffset);
 
-                    if (cursorFrames[i - maxFrameCount + cursorFrames.Length] is { } cursor)
-                        cursorRenderer.Render(cursor.CursorHandle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
+                    var frame = frames[i - maxFrameCount + frames.Length];
+
+                    if (frame.Cursor is { } cursor)
+                        cursorRenderer.Render(cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
                     quantizer.Quantize(composition.Pixels, paletteBuffer, out var paletteLength, indexedImageBuffer);
 
                     var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
 
+                    ushort delayInHundredthsOfASecond;
                     var isLastFrame = i == maxFrameCount - 1;
+                    if (isLastFrame)
+                    {
+                        delayInHundredthsOfASecond = 400;
+                    }
+                    else
+                    {
+                        var nextFrame = frames[i + 1 - maxFrameCount + frames.Length];
+                        var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
+                        delayInHundredthsOfASecond = (ushort)((nextFrame.Timestamp - frame.Timestamp) / stopwatchTicksPerHundredthOfASecond);
+                    }
 
-                    writer.WriteGraphicControlExtensionBlock(
-                        delayInHundredthsOfASecond: isLastFrame ? 400 : 10,
-                        transparentColorIndex: null);
+                    writer.WriteGraphicControlExtensionBlock(delayInHundredthsOfASecond, transparentColorIndex: null);
 
                     writer.WriteImageDescriptor(
                         left: 0, // TODO: optimize to crop to only changed pixels (before choosing a palette, too) and potentially double the length of the previous delay
