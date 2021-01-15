@@ -110,7 +110,11 @@ namespace Techsola.InstantReplay
                                 continue;
                         }
 
-                        if (!User32.IsWindowVisible(window)) continue;
+                        if (!User32.IsWindowVisible(window))
+                        {
+                            windowState.AddInvisibleFrame();
+                            continue;
+                        }
 
                         var clientTopLeft = default(POINT);
                         if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");

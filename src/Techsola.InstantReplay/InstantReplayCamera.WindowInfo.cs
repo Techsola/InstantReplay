@@ -47,6 +47,11 @@ namespace Techsola.InstantReplay
                 frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder);
             }
 
+            public void AddInvisibleFrame()
+            {
+                frames.GetNextRef()?.SetInvisible();
+            }
+
             public void MarkClosed()
             {
                 if (windowDC is null) return;
