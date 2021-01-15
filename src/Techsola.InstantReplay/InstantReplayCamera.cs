@@ -269,6 +269,9 @@ namespace Techsola.InstantReplay
                     if (frame.Cursor is { } cursor)
                         cursorRenderer.Render(cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
+                    if (!Gdi32.GdiFlush())
+                        throw new Win32Exception("GdiFlush failed.");
+
                     quantizer.Quantize(composition.Pixels, paletteBuffer, out var paletteLength, indexedImageBuffer);
 
                     var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);

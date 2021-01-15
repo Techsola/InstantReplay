@@ -11,6 +11,9 @@ namespace Techsola.InstantReplay
 
         public Gdi32.DeviceContextSafeHandle DeviceContext { get; }
 
+        /// <summary>
+        /// Call <see cref="Gdi32.GdiFlush"/> before accessing pixels after batchable GDI functions have been called.
+        /// </summary>
         public ColorEnumerable Pixels { get; }
 
         public Composition(int width, int height, ushort bitsPerPixel)
