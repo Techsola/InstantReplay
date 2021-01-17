@@ -28,13 +28,11 @@ While other integrations could happen in the future, right now this library only
 
 | App model     | Supported    |
 |---------------|--------------|
-| Windows Forms | ✔*           |
+| Windows Forms | ✔            |
 | WPF           | ✔ (untested) |
 | UWP           | ❌           |
 
 To continue fleshing out the list: support currently depends on whether the app is able to [invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke) native Windows functions such as [`BitBlt`](https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-bitblt) and [`EnumWindows`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows).
-
-*DirectX acceleration within Windows Forms apps has also not yet been tested.
 
 ## How to use
 
