@@ -91,6 +91,8 @@ namespace Techsola.InstantReplay
                             : null));
 
                     var zOrder = 0u;
+                    var needsGdiFlush = false;
+
                     foreach (var window in currentWindows)
                     {
                         if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
@@ -120,9 +122,14 @@ namespace Techsola.InstantReplay
                         if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
                         if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
 
-                        windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder);
+                        windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder, ref needsGdiFlush);
                         zOrder++;
                     }
+
+                    // Make sure to flush on the same thread that called the GDI function in case this thread goes away.
+                    // (https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gdiflush#remarks)
+                    if (needsGdiFlush && !Gdi32.GdiFlush())
+                        throw new Win32Exception("GdiFlush failed.");
 
                     var closedWindowsWithNoFrames = new List<IntPtr>();
 
@@ -248,7 +255,7 @@ namespace Techsola.InstantReplay
                 for (var i = 0; i < maxFrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
-                    composition.Clear(0, 0, compositionWidth, compositionHeight);
+                    composition.Clear(0, 0, compositionWidth, compositionHeight, out var needsGdiFlush);
 
                     windowFramesToDraw.Clear();
 
@@ -262,14 +269,14 @@ namespace Techsola.InstantReplay
                     windowFramesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
 
                     foreach (var windowFrame in windowFramesToDraw)
-                        windowFrame.Compose(bitmapDC, composition.DeviceContext, compositionOffset);
+                        windowFrame.Compose(bitmapDC, composition.DeviceContext, compositionOffset, ref needsGdiFlush);
 
                     var frame = frames[i - maxFrameCount + frames.Length];
 
                     if (frame.Cursor is { } cursor)
                         cursorRenderer.Render(cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
-                    if (!Gdi32.GdiFlush())
+                    if (needsGdiFlush && !Gdi32.GdiFlush())
                         throw new Win32Exception("GdiFlush failed.");
 
                     quantizer.Quantize(composition.Pixels, paletteBuffer, out var paletteLength, indexedImageBuffer);

@@ -35,7 +35,8 @@ namespace Techsola.InstantReplay
                 int windowClientWidth,
                 int windowClientHeight,
                 uint windowDpi,
-                uint zOrder)
+                uint zOrder,
+                ref bool needsGdiFlush)
             {
                 if (windowClientWidth > 0 && windowClientHeight > 0)
                 {
@@ -73,7 +74,15 @@ namespace Techsola.InstantReplay
                     Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
                     if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowClientWidth, windowClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
-                        throw new Win32Exception();
+                    {
+                        var lastError = Marshal.GetLastWin32Error();
+                        if (lastError != 0) throw new Win32Exception(lastError);
+                        needsGdiFlush = true;
+                    }
+                    else
+                    {
+                        needsGdiFlush = false;
+                    }
                 }
 
                 WindowClientLeft = windowClientLeft;
@@ -90,7 +99,7 @@ namespace Techsola.InstantReplay
                 WindowClientHeight = 0;
             }
 
-            public void Compose(Gdi32.DeviceContextSafeHandle bitmapDC, Gdi32.DeviceContextSafeHandle compositionDC, (int X, int Y) compositionOffset)
+            public void Compose(Gdi32.DeviceContextSafeHandle bitmapDC, Gdi32.DeviceContextSafeHandle compositionDC, (int X, int Y) compositionOffset, ref bool needsGdiFlush)
             {
                 if (bitmap is null || WindowClientWidth == 0 || WindowClientHeight == 0)
                     return;
@@ -108,7 +117,13 @@ namespace Techsola.InstantReplay
                     0,
                     Gdi32.RasterOperation.SRCCOPY))
                 {
-                    throw new Win32Exception();
+                    var lastError = Marshal.GetLastWin32Error();
+                    if (lastError != 0) throw new Win32Exception(lastError);
+                    needsGdiFlush = true;
+                }
+                else
+                {
+                    needsGdiFlush = false;
                 }
             }
         }

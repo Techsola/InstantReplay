@@ -39,12 +39,13 @@ namespace Techsola.InstantReplay
                 int windowClientWidth,
                 int windowClientHeight,
                 uint windowDpi,
-                uint zOrder)
+                uint zOrder,
+                ref bool needsGdiFlush)
             {
                 if (windowDC is null) throw new InvalidOperationException("The window is closed.");
 
                 var frame = frames.GetNextRef() ??= new();
-                frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder);
+                frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder, ref needsGdiFlush);
             }
 
             public void AddInvisibleFrame()

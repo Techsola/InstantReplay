@@ -50,10 +50,18 @@ namespace Techsola.InstantReplay
             DeviceContext.Dispose();
         }
 
-        public void Clear(int x, int y, int width, int height)
+        public void Clear(int x, int y, int width, int height, out bool needsGdiFlush)
         {
             if (!Gdi32.BitBlt(DeviceContext, x, y, width, height, IntPtr.Zero, 0, 0, Gdi32.RasterOperation.BLACKNESS))
-                throw new Win32Exception("BitBlt failed.");
+            {
+                var lastError = Marshal.GetLastWin32Error();
+                if (lastError != 0) throw new Win32Exception(lastError);
+                needsGdiFlush = true;
+            }
+            else
+            {
+                needsGdiFlush = false;
+            }
         }
     }
 }
