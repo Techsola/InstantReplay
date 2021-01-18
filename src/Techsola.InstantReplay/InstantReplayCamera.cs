@@ -209,7 +209,7 @@ namespace Techsola.InstantReplay
                 {
                     for (var i = 0; i < frameList.Length; i++)
                     {
-                        if (frameList[i] is not { } frame) continue;
+                        if (frameList[i] is not { WindowClientWidth: > 0, WindowClientHeight: > 0 } frame) continue;
 
                         var frameCount = frameList.Length - i;
                         if (maxFrameCount < frameCount) maxFrameCount = frameCount;
