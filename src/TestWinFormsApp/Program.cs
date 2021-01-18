@@ -57,16 +57,19 @@ namespace TestWinFormsApp
 
         private static void Save()
         {
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                var directoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Techsola.InstantReplay");
+                if (InstantReplayCamera.SaveGif() is { } bytes)
+                {
+                    var directoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Techsola.InstantReplay");
 
-                Directory.CreateDirectory(directoryPath);
+                    Directory.CreateDirectory(directoryPath);
 
-                var fileName = $"{DateTime.Now:yyyy-MM-dd HH.mm.ss}.gif";
-                using var stream = File.Create(Path.Combine(directoryPath, fileName));
+                    var filePath = Path.Combine(directoryPath, $"{DateTime.Now:yyyy-MM-dd HH.mm.ss}.gif");
+                    using var stream = File.Create(filePath);
 
-                InstantReplayCamera.SaveGif(stream);
+                    await stream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+                }
             });
         }
 

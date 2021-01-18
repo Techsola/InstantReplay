@@ -162,15 +162,12 @@ namespace Techsola.InstantReplay
         /// <summary>
         /// <para>
         /// Blocks while synchronously compositing, quantizing, and encoding all buffered screenshots and cursor
-        /// movements and writing them to the specified stream. No frames are erased by this call, and no new frames are
-        /// buffered while this method is executing.
+        /// movements and writing them to the array that is returned. No frames are erased by this call, and no new
+        /// frames are buffered while this method is executing.
         /// </para>
         /// <para>
-        /// ⚠ Consider using <see cref="System.Threading.Tasks.Task.Run(Action)"/> to prevent the CPU-intensive quantizing and encoding from
-        /// making the application unresponsive. An even stronger reason to consider this is if <paramref
-        /// name="stream"/> does I/O-bound work. I/O can be unexpectedly delayed for a number of situations that may
-        /// never come up while testing, and any I/O delay makes the app unresponsive for longer if this method is
-        /// called from the UI thread.
+        /// ⚠ Consider using <see cref="System.Threading.Tasks.Task.Run(Action)"/> to prevent the CPU-intensive
+        /// quantizing and encoding from making the application unresponsive.
         /// </para>
         /// <para>
         /// This method is thread-safe and does not behave differently when called from the UI thread or any other
@@ -180,8 +177,8 @@ namespace Techsola.InstantReplay
 #else
         /// <summary>
         /// <para>
-        /// Blocks while synchronously compositing, quantizing, and encoding all buffered screenshots and cursor
-        /// movements and writing them to the specified stream. No frames are erased by this call, and no new frames are
+        /// Generates a GIF of the currently-buffered screenshots and cursor movements. Returns <see langword="null"/>
+        /// if there are no screenshots currently buffered. No frames are erased by this call, and no new frames are
         /// buffered while this method is executing.
         /// </para>
         /// <para>
@@ -190,7 +187,7 @@ namespace Techsola.InstantReplay
         /// </para>
         /// </summary>
 #endif
-        public static void SaveGif(Stream stream)
+        public static byte[]? SaveGif()
         {
             FrameLock.EnterReadLock();
             try
@@ -221,6 +218,8 @@ namespace Techsola.InstantReplay
                     }
                 }
 
+                if (maxFrameCount == 0) return null;
+
                 var compositionOffset = (X: -minLeft, Y: -minTop);
                 var compositionWidth = maxRight - minLeft;
                 var compositionHeight = maxBottom - minTop;
@@ -232,6 +231,7 @@ namespace Techsola.InstantReplay
 
                 var cursorRenderer = new AnimatedCursorRenderer(composition.DeviceContext);
 
+                var stream = new MemoryStream();
                 var writer = new GifWriter(stream);
 
                 writer.BeginStream(
@@ -313,6 +313,7 @@ namespace Techsola.InstantReplay
                 }
 
                 writer.EndStream();
+                return stream.ToArray();
             }
             finally
             {
