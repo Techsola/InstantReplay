@@ -59,7 +59,7 @@ For a Windows Forms app, the ideal place for this call is in `Program.Main` befo
 
 ### Profit
 
-Whenever you want a GIF of the last ten seconds of the app’s user interface, call `InstantReplayCamera.SaveGif(stream);` to write an animated GIF image to the destination of your choice. A good place to do this is in your app’s top-level unhandled exception reporter so that you get a recording of the UI along with the exception information.
+Whenever you want a GIF of the last ten seconds of the app’s user interface, call `InstantReplayCamera.SaveGif();` to obtain a byte array containing an animated GIF. (Or `null`, if there are currently no frames to save.) A good place to do this is in your app’s top-level unhandled exception reporter so that you get a recording of the UI along with the exception information.
 
 TODO: Recommend the use of `Task.Run` when on a UI thread due to the CPU-blocking work it takes to encode a GIF.
 
