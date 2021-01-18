@@ -262,7 +262,7 @@ namespace Techsola.InstantReplay
                     foreach (var frameList in framesByWindow)
                     {
                         var index = i - maxFrameCount + frameList.Length;
-                        if (index >= 0 && frameList[index] is { } windowFrame)
+                        if (index >= 0 && frameList[index] is { WindowClientWidth: > 0, WindowClientHeight: > 0 } windowFrame)
                             windowFramesToDraw.Add(windowFrame);
                     }
 
