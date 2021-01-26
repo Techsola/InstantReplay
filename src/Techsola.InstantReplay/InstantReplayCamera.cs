@@ -28,6 +28,7 @@ namespace Techsola.InstantReplay
         private const int BufferSize = DurationInSeconds * FramesPerSecond;
 
         private static Timer? timer;
+        private static Action<Exception>? reportBackgroundException;
         private static WindowEnumerator? windowEnumerator;
         private static Gdi32.DeviceContextSafeHandle? bitmapDC;
         private static readonly ReaderWriterLockSlim FrameLock = new();
@@ -48,8 +49,23 @@ namespace Techsola.InstantReplay
         /// thread.
         /// </para>
         /// </summary>
-        public static void Start()
+        /// <param name="reportBackgroundException">
+        /// <para>
+        /// Please report exceptions just as you would for <see cref="AppDomain.UnhandledException"/> and other
+        /// top-level exception events such as <c>TaskScheduler.UnobservedTaskException</c> and
+        /// <c>Application.ThreadException</c>. When you come across an exception that appears to be a flaw in
+        /// Techsola.InstantReplay, please report it at <see href="https://github.com/Techsola/InstantReplay/issues"/>.
+        /// </para>
+        /// <para>
+        /// Ideally there will be no unhandled exceptions, but they are a normal part of the development cycle. This
+        /// parameter is provided so that the runtime does not forcibly terminate your app due to an exception in the
+        /// timer callback in Techsola.InstantReplay.
+        /// </para>
+        /// </param>
+        public static void Start(Action<Exception> reportBackgroundException)
         {
+            if (reportBackgroundException is null) throw new ArgumentNullException(nameof(reportBackgroundException));
+
 #if !NET35
             if (Volatile.Read(ref timer) is not null) return;
 #else
@@ -63,6 +79,8 @@ namespace Techsola.InstantReplay
             }
             else
             {
+                InstantReplayCamera.reportBackgroundException = reportBackgroundException;
+
                 // Consider varying timer frequency when there are no visible windows to e.g. 1 second
                 newTimer.Change(dueTime: TimeSpan.Zero, period: TimeSpan.FromSeconds(1.0 / FramesPerSecond));
             }
@@ -70,91 +88,101 @@ namespace Techsola.InstantReplay
 
         private static void AddFrames(object? state)
         {
-            if (!FrameLock.TryEnterWriteLock(TimeSpan.Zero)) return;
             try
             {
-                var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
-                if (!User32.GetCursorInfo(ref cursorInfo)) throw new Win32Exception();
-
-                var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
-
-                bitmapDC ??= Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
-
-                var now = Stopwatch.GetTimestamp();
-
-                lock (InfoByWindowHandle)
+                if (!FrameLock.TryEnterWriteLock(TimeSpan.Zero)) return;
+                try
                 {
-                    Frames.Add((
-                        Timestamp: now,
-                        Cursor: (cursorInfo.flags & (User32.CURSOR.SHOWING | User32.CURSOR.SUPPRESSED)) == User32.CURSOR.SHOWING
-                            ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
-                            : null));
+                    var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
+                    if (!User32.GetCursorInfo(ref cursorInfo)) throw new Win32Exception();
 
-                    var zOrder = 0u;
-                    var needsGdiFlush = false;
+                    var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
-                    foreach (var window in currentWindows)
+                    bitmapDC ??= Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
+
+                    var now = Stopwatch.GetTimestamp();
+
+                    lock (InfoByWindowHandle)
                     {
-                        if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
-                        {
-                            if (User32.IsWindowVisible(window))
-                            {
-                                windowState = new(window, firstSeen: now, BufferSize);
-                                InfoByWindowHandle.Add(window, windowState);
-                            }
-                            continue;
-                        }
-                        else
-                        {
-                            windowState.LastSeen = now;
+                        Frames.Add((
+                            Timestamp: now,
+                            Cursor: (cursorInfo.flags & (User32.CURSOR.SHOWING | User32.CURSOR.SUPPRESSED)) == User32.CURSOR.SHOWING
+                                ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
+                                : null));
 
-                            if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
+                        var zOrder = 0u;
+                        var needsGdiFlush = false;
+
+                        foreach (var window in currentWindows)
+                        {
+                            if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
+                            {
+                                if (User32.IsWindowVisible(window))
+                                {
+                                    windowState = new(window, firstSeen: now, BufferSize);
+                                    InfoByWindowHandle.Add(window, windowState);
+                                }
                                 continue;
-                        }
-
-                        if (!User32.IsWindowVisible(window))
-                        {
-                            windowState.AddInvisibleFrame();
-                            continue;
-                        }
-
-                        var clientTopLeft = default(POINT);
-                        if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
-                        if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
-
-                        windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder, ref needsGdiFlush);
-                        zOrder++;
-                    }
-
-                    // Make sure to flush on the same thread that called the GDI function in case this thread goes away.
-                    // (https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gdiflush#remarks)
-                    if (needsGdiFlush && !Gdi32.GdiFlush())
-                        throw new Win32Exception("GdiFlush failed.");
-
-                    var closedWindowsWithNoFrames = new List<IntPtr>();
-
-                    foreach (var entry in InfoByWindowHandle)
-                    {
-                        if (entry.Value.LastSeen != now)
-                        {
-                            entry.Value.MarkClosed();
-                            entry.Value.DisposeNextFrame(out var allFramesDisposed);
-
-                            if (allFramesDisposed)
+                            }
+                            else
                             {
-                                entry.Value.Dispose();
-                                closedWindowsWithNoFrames.Add(entry.Key);
+                                windowState.LastSeen = now;
+
+                                if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
+                                    continue;
+                            }
+
+                            if (!User32.IsWindowVisible(window))
+                            {
+                                windowState.AddInvisibleFrame();
+                                continue;
+                            }
+
+                            var clientTopLeft = default(POINT);
+                            if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
+                            if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
+
+                            windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder, ref needsGdiFlush);
+                            zOrder++;
+                        }
+
+                        // Make sure to flush on the same thread that called the GDI function in case this thread goes away.
+                        // (https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gdiflush#remarks)
+                        if (needsGdiFlush && !Gdi32.GdiFlush())
+                            throw new Win32Exception("GdiFlush failed.");
+
+                        var closedWindowsWithNoFrames = new List<IntPtr>();
+
+                        foreach (var entry in InfoByWindowHandle)
+                        {
+                            if (entry.Value.LastSeen != now)
+                            {
+                                entry.Value.MarkClosed();
+                                entry.Value.DisposeNextFrame(out var allFramesDisposed);
+
+                                if (allFramesDisposed)
+                                {
+                                    entry.Value.Dispose();
+                                    closedWindowsWithNoFrames.Add(entry.Key);
+                                }
                             }
                         }
-                    }
 
-                    foreach (var window in closedWindowsWithNoFrames)
-                        InfoByWindowHandle.Remove(window);
+                        foreach (var window in closedWindowsWithNoFrames)
+                            InfoByWindowHandle.Remove(window);
+                    }
+                }
+                finally
+                {
+                    FrameLock.ExitWriteLock();
                 }
             }
-            finally
+#pragma warning disable CA1031 // If this is not caught, the runtime forcibly terminates the app.
+            catch (Exception ex)
+#pragma warning restore CA1031
             {
-                FrameLock.ExitWriteLock();
+                // Never null because this field is set before the timer is first queued.
+                reportBackgroundException!.Invoke(ex);
             }
         }
 

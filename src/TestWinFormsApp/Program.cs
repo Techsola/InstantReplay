@@ -12,7 +12,12 @@ namespace TestWinFormsApp
         [STAThread]
         public static void Main()
         {
-            InstantReplayCamera.Start();
+            InstantReplayCamera.Start(
+                reportBackgroundException: ex => MessageBox.Show(
+                    ex.ToString(),
+                    "Unhandled exception in Techsola.InstantReplay",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error));
 
             Application.SetCompatibleTextRenderingDefault(false);
             Application.EnableVisualStyles();

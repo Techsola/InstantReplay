@@ -9,6 +9,7 @@ namespace Techsola.InstantReplay
     {
         public static byte[] SaveGif();
 
-        public static void Start();
+        [System.Runtime.CompilerServices.NullableContext(1)]
+        public static void Start(System.Action<System.Exception> reportBackgroundException);
     }
 }
