@@ -66,24 +66,14 @@ namespace Techsola.InstantReplay
         {
             if (reportBackgroundException is null) throw new ArgumentNullException(nameof(reportBackgroundException));
 
-#if !NET35
-            if (Volatile.Read(ref timer) is not null) return;
-#else
-            if (timer is not null) return;
-#endif
-            var newTimer = new Timer(AddFrames);
-
-            if (Interlocked.CompareExchange(ref timer, newTimer, null) is not null)
+            if (Interlocked.CompareExchange(ref InstantReplayCamera.reportBackgroundException, reportBackgroundException, null) is not null)
             {
-                newTimer.Dispose();
+                // This method has been called before. Ignore.
+                return;
             }
-            else
-            {
-                InstantReplayCamera.reportBackgroundException = reportBackgroundException;
 
-                // Consider varying timer frequency when there are no visible windows to e.g. 1 second
-                newTimer.Change(dueTime: TimeSpan.Zero, period: TimeSpan.FromSeconds(1.0 / FramesPerSecond));
-            }
+            // Consider varying timer frequency when there are no visible windows to e.g. 1 second
+            timer = new Timer(AddFrames, state: null, dueTime: TimeSpan.Zero, period: TimeSpan.FromSeconds(1.0 / FramesPerSecond));
         }
 
         private static void AddFrames(object? state)
