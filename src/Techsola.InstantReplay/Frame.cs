@@ -58,7 +58,7 @@ namespace Techsola.InstantReplay
                             bitmap.Dispose();
                         }
 
-                        bitmap = Gdi32.CreateDIBSection(windowDC, new()
+                        bitmap = Gdi32.CreateDIBSection(bitmapDC, new()
                         {
                             bmiHeader =
                             {
