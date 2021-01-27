@@ -27,6 +27,9 @@ namespace Techsola.InstantReplay
         private const int DurationInSeconds = 10;
         private const int BufferSize = DurationInSeconds * FramesPerSecond;
 
+        private static readonly FrequencyLimiter BackgroundExceptionReportLimiter = new(
+            new(maximumCount: 3, withinDuration: TimeSpan.FromHours(1)));
+
         private static Timer? timer;
         private static Action<Exception>? reportBackgroundException;
         private static WindowEnumerator? windowEnumerator;
@@ -34,6 +37,7 @@ namespace Techsola.InstantReplay
         private static readonly ReaderWriterLockSlim FrameLock = new();
         private static readonly Dictionary<IntPtr, WindowState> InfoByWindowHandle = new();
         private static readonly CircularBuffer<(long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)> Frames = new(BufferSize);
+        private static bool isDisabled;
 
         /// <summary>
         /// <para>
@@ -78,19 +82,23 @@ namespace Techsola.InstantReplay
 
         private static void AddFrames(object? state)
         {
+            if (isDisabled) return;
+
+            var now = Stopwatch.GetTimestamp();
+
             try
             {
                 if (!FrameLock.TryEnterWriteLock(TimeSpan.Zero)) return;
                 try
                 {
+                    if (isDisabled) return;
+
                     var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
                     if (!User32.GetCursorInfo(ref cursorInfo)) throw new Win32Exception();
 
                     var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
                     bitmapDC ??= Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
-
-                    var now = Stopwatch.GetTimestamp();
 
                     lock (InfoByWindowHandle)
                     {
@@ -171,8 +179,15 @@ namespace Techsola.InstantReplay
             catch (Exception ex)
 #pragma warning restore CA1031
             {
-                // Never null because this field is set before the timer is first queued.
-                reportBackgroundException!.Invoke(ex);
+                if (BackgroundExceptionReportLimiter.TryAddOccurrence(now))
+                {
+                    reportBackgroundException!.Invoke(ex);
+                }
+                else
+                {
+                    isDisabled = true;
+                    timer!.Dispose();
+                }
             }
         }
 
@@ -207,6 +222,8 @@ namespace Techsola.InstantReplay
 #endif
         public static byte[]? SaveGif()
         {
+            if (isDisabled) return null;
+
             FrameLock.EnterReadLock();
             try
             {

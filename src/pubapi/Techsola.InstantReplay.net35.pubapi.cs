@@ -3,13 +3,13 @@
 
 namespace Techsola.InstantReplay
 {
-    [System.Runtime.CompilerServices.NullableContext(2)]
+    [System.Runtime.CompilerServices.NullableContext(1)]
     [System.Runtime.CompilerServices.Nullable(0)]
     public static class InstantReplayCamera
     {
+        [System.Runtime.CompilerServices.NullableContext(2)]
         public static byte[] SaveGif();
 
-        [System.Runtime.CompilerServices.NullableContext(1)]
         public static void Start(System.Action<System.Exception> reportBackgroundException);
     }
 }
