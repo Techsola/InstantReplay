@@ -72,7 +72,16 @@ namespace Techsola.InstantReplay
                         if ((ERROR)lastError == ERROR.DC_NOT_FOUND)
                         {
                             windowDC.Dispose();
-                            windowDC = User32.GetDC(windowDC.HWnd).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
+                            windowDC = User32.GetDC(windowDC.HWnd);
+                            if (windowDC.IsInvalid)
+                            {
+                                // This happens when the window goes away. Let this be detected on the next cycle, if it
+                                // was actually due to the window closing and not some other failure. Just make sure a
+                                // stale frame isn't drawn during this cycle.
+                                SetInvisible();
+                                return;
+                            }
+
                             goto retryBitBlt;
                         }
 

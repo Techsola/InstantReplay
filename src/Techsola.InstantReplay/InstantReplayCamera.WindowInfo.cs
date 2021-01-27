@@ -14,13 +14,11 @@ namespace Techsola.InstantReplay
             public long FirstSeen { get; }
             public long LastSeen { get; set; }
 
-            public WindowState(IntPtr handle, long firstSeen, int bufferSize)
+            public WindowState(User32.WindowDeviceContextSafeHandle windowDC, long firstSeen, int bufferSize)
             {
+                this.windowDC = windowDC;
                 FirstSeen = firstSeen;
                 LastSeen = firstSeen;
-
-                windowDC = User32.GetDC(handle).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
-
                 frames = new(bufferSize);
             }
 

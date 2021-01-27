@@ -116,9 +116,9 @@ namespace Techsola.InstantReplay
                             if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
                             {
                                 // The window hasn't been seen before
-                                if (User32.IsWindowVisible(window))
+                                if (User32.IsWindowVisible(window) && User32.GetDC(window) is { IsInvalid: false } windowDC)
                                 {
-                                    windowState = new(window, firstSeen: now, BufferSize);
+                                    windowState = new(windowDC, firstSeen: now, BufferSize);
                                     InfoByWindowHandle.Add(window, windowState);
                                 }
                             }
