@@ -35,13 +35,8 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createcompatibledc"/>
         /// </summary>
-        public static DeviceContextSafeHandle CreateCompatibleDC(IntPtr hdc)
-        {
-            return new(hWnd: null, CreateCompatibleDC_PInvoke(hdc));
-        }
-
-        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleDC")]
-        private static extern IntPtr CreateCompatibleDC_PInvoke(IntPtr hdc);
+        [DllImport("gdi32.dll")]
+        public static extern CreatedDeviceContextSafeHandle CreateCompatibleDC(IntPtr hdc);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createdibsection"/>

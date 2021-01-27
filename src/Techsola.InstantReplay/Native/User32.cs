@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Techsola.InstantReplay.Native
 {
-    internal static class User32
+    internal static partial class User32
     {
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-clienttoscreen"/>
@@ -84,7 +84,7 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdc"/>
         /// </summary>
-        public static Gdi32.DeviceContextSafeHandle GetDC(IntPtr hWnd)
+        public static WindowDeviceContextSafeHandle GetDC(IntPtr hWnd)
         {
             return new(hWnd, GetDC_PInvoke(hWnd));
         }

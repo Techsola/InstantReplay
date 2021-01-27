@@ -115,32 +115,37 @@ namespace Techsola.InstantReplay
                         {
                             if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
                             {
-                                if (User32.IsWindowVisible(window))
+                                // The window hasn't been seen before
+                                if (User32.IsWindowVisible(window) && User32.GetDC(window) is { IsInvalid: false } windowDC)
                                 {
-                                    windowState = new(window, firstSeen: now, BufferSize);
+                                    windowState = new(windowDC, firstSeen: now, BufferSize);
                                     InfoByWindowHandle.Add(window, windowState);
                                 }
-                                continue;
                             }
                             else
                             {
-                                windowState.LastSeen = now;
-
+                                // The window has been seen before
                                 if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
+                                {
+                                    // No frames have been added yet
+                                }
+                                else if (!User32.IsWindowVisible(window))
+                                {
+                                    windowState.AddInvisibleFrame();
+                                }
+                                else if (GetWindowMetricsIfExists(window) is { } metrics)
+                                {
+                                    windowState.AddFrame(bitmapDC, metrics, zOrder, ref needsGdiFlush);
+                                    zOrder++;
+                                }
+                                else
+                                {
+                                    // The window will be detected as closed
                                     continue;
+                                }
+
+                                windowState.LastSeen = now; // Keeps the window from being detected as closed
                             }
-
-                            if (!User32.IsWindowVisible(window))
-                            {
-                                windowState.AddInvisibleFrame();
-                                continue;
-                            }
-
-                            if (!User32.ClientToScreen(window, out var clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
-                            if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
-
-                            windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder, ref needsGdiFlush);
-                            zOrder++;
                         }
 
                         // Make sure to flush on the same thread that called the GDI function in case this thread goes away.
@@ -188,6 +193,24 @@ namespace Techsola.InstantReplay
                     timer!.Dispose();
                 }
             }
+        }
+
+        private static WindowMetrics? GetWindowMetricsIfExists(IntPtr window)
+        {
+            if (!User32.ClientToScreen(window, out var clientTopLeft))
+                return null; // This is what happens when the window handle becomes invalid.
+
+            if (!User32.GetClientRect(window, out var clientRect))
+            {
+                var lastError = Marshal.GetLastWin32Error();
+                if ((ERROR)lastError == ERROR.INVALID_WINDOW_HANDLE) return null;
+                throw new Win32Exception(lastError);
+            }
+
+            var dpi = User32.GetDpiForWindow(window);
+            if (dpi == 0) return null; // This is what happens when the window handle becomes invalid.
+
+            return new(clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, dpi);
         }
 
 #if !NET35
@@ -240,15 +263,15 @@ namespace Techsola.InstantReplay
                 {
                     for (var i = 0; i < frameList.Length; i++)
                     {
-                        if (frameList[i] is not { WindowClientWidth: > 0, WindowClientHeight: > 0 } frame) continue;
+                        if (frameList[i]?.WindowMetrics is not { ClientWidth: > 0, ClientHeight: > 0 } metrics) continue;
 
                         var frameCount = frameList.Length - i;
                         if (maxFrameCount < frameCount) maxFrameCount = frameCount;
 
-                        if (minLeft > frame.WindowClientLeft) minLeft = frame.WindowClientLeft;
-                        if (minTop > frame.WindowClientTop) minTop = frame.WindowClientTop;
-                        if (maxRight < frame.WindowClientLeft + frame.WindowClientWidth) maxRight = frame.WindowClientLeft + frame.WindowClientWidth;
-                        if (maxBottom < frame.WindowClientTop + frame.WindowClientHeight) maxBottom = frame.WindowClientTop + frame.WindowClientHeight;
+                        if (minLeft > metrics.ClientLeft) minLeft = metrics.ClientLeft;
+                        if (minTop > metrics.ClientTop) minTop = metrics.ClientTop;
+                        if (maxRight < metrics.ClientLeft + metrics.ClientWidth) maxRight = metrics.ClientLeft + metrics.ClientWidth;
+                        if (maxBottom < metrics.ClientTop + metrics.ClientHeight) maxBottom = metrics.ClientTop + metrics.ClientHeight;
                     }
                 }
 
@@ -296,7 +319,7 @@ namespace Techsola.InstantReplay
                     foreach (var frameList in framesByWindow)
                     {
                         var index = i - maxFrameCount + frameList.Length;
-                        if (index >= 0 && frameList[index] is { WindowClientWidth: > 0, WindowClientHeight: > 0 } windowFrame)
+                        if (index >= 0 && frameList[index] is { WindowMetrics: { ClientWidth: > 0, ClientHeight: > 0 } } windowFrame)
                             windowFramesToDraw.Add(windowFrame);
                     }
 

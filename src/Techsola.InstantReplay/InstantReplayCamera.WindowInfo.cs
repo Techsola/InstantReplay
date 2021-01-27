@@ -7,20 +7,18 @@ namespace Techsola.InstantReplay
     {
         private sealed class WindowState : IDisposable
         {
-            private Gdi32.DeviceContextSafeHandle? windowDC;
+            private User32.WindowDeviceContextSafeHandle? windowDC;
             private readonly CircularBuffer<Frame?> frames;
             private int disposedFrameCount;
 
             public long FirstSeen { get; }
             public long LastSeen { get; set; }
 
-            public WindowState(IntPtr handle, long firstSeen, int bufferSize)
+            public WindowState(User32.WindowDeviceContextSafeHandle windowDC, long firstSeen, int bufferSize)
             {
+                this.windowDC = windowDC;
                 FirstSeen = firstSeen;
                 LastSeen = firstSeen;
-
-                windowDC = User32.GetDC(handle).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
-
                 frames = new(bufferSize);
             }
 
@@ -34,18 +32,14 @@ namespace Techsola.InstantReplay
 
             public void AddFrame(
                 Gdi32.DeviceContextSafeHandle bitmapDC,
-                int windowClientLeft,
-                int windowClientTop,
-                int windowClientWidth,
-                int windowClientHeight,
-                uint windowDpi,
+                WindowMetrics windowMetrics,
                 uint zOrder,
                 ref bool needsGdiFlush)
             {
                 if (windowDC is null) throw new InvalidOperationException("The window is closed.");
 
                 var frame = frames.GetNextRef() ??= new();
-                frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder, ref needsGdiFlush);
+                frame.Overwrite(bitmapDC, ref windowDC, windowMetrics, zOrder, ref needsGdiFlush);
             }
 
             public void AddInvisibleFrame()
