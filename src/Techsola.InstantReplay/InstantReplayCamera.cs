@@ -122,25 +122,26 @@ namespace Techsola.InstantReplay
                                 }
                                 continue;
                             }
-                            else
-                            {
-                                windowState.LastSeen = now;
 
-                                if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
-                                    continue;
+                            if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
+                            {
+                                windowState.LastSeen = now; // Keep window from being detected as closed
+                                continue;
                             }
 
                             if (!User32.IsWindowVisible(window))
                             {
+                                windowState.LastSeen = now; // Keep window from being detected as closed
                                 windowState.AddInvisibleFrame();
                                 continue;
                             }
 
-                            if (!User32.ClientToScreen(window, out var clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
-                            if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
-
-                            windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder, ref needsGdiFlush);
-                            zOrder++;
+                            if (GetWindowMetricsIfExists(window) is { } metrics)
+                            {
+                                windowState.LastSeen = now; // Keep window from being detected as closed
+                                windowState.AddFrame(bitmapDC, metrics.ClientLeft, metrics.ClientTop, metrics.ClientWidth, metrics.ClientHeight, metrics.Dpi, zOrder, ref needsGdiFlush);
+                                zOrder++;
+                            }
                         }
 
                         // Make sure to flush on the same thread that called the GDI function in case this thread goes away.
@@ -188,6 +189,24 @@ namespace Techsola.InstantReplay
                     timer!.Dispose();
                 }
             }
+        }
+
+        private static WindowMetrics? GetWindowMetricsIfExists(IntPtr window)
+        {
+            if (!User32.ClientToScreen(window, out var clientTopLeft))
+                return null; // This is what happens when the window handle becomes invalid.
+
+            if (!User32.GetClientRect(window, out var clientRect))
+            {
+                var lastError = Marshal.GetLastWin32Error();
+                if ((ERROR)lastError == ERROR.INVALID_WINDOW_HANDLE) return null;
+                throw new Win32Exception(lastError);
+            }
+
+            var dpi = User32.GetDpiForWindow(window);
+            if (dpi == 0) return null; // This is what happens when the window handle becomes invalid.
+
+            return new(clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, dpi);
         }
 
 #if !NET35
