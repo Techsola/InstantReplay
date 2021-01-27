@@ -9,7 +9,7 @@ namespace Techsola.InstantReplay.Native
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-clienttoscreen"/>
         /// </summary>
         [DllImport("user32.dll")]
-        public static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+        public static extern bool ClientToScreen(IntPtr hWnd, out POINT lpPoint);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-drawiconex"/>

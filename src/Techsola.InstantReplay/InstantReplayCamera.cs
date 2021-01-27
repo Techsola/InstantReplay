@@ -136,8 +136,7 @@ namespace Techsola.InstantReplay
                                 continue;
                             }
 
-                            var clientTopLeft = default(POINT);
-                            if (!User32.ClientToScreen(window, ref clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
+                            if (!User32.ClientToScreen(window, out var clientTopLeft)) throw new Win32Exception("ClientToScreen failed.");
                             if (!User32.GetClientRect(window, out var clientRect)) throw new Win32Exception();
 
                             windowState.AddFrame(bitmapDC, clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, User32.GetDpiForWindow(window), zOrder, ref needsGdiFlush);
