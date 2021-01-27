@@ -115,32 +115,36 @@ namespace Techsola.InstantReplay
                         {
                             if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
                             {
+                                // The window hasn't been seen before
                                 if (User32.IsWindowVisible(window))
                                 {
                                     windowState = new(window, firstSeen: now, BufferSize);
                                     InfoByWindowHandle.Add(window, windowState);
                                 }
-                                continue;
                             }
-
-                            if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
+                            else
                             {
-                                windowState.LastSeen = now; // Keep window from being detected as closed
-                                continue;
-                            }
+                                // The window has been seen before
+                                if ((now - windowState.FirstSeen) < Stopwatch.Frequency * MillisecondsBeforeBitBltingNewWindow / 1000)
+                                {
+                                    // No frames have been added yet
+                                }
+                                else if (!User32.IsWindowVisible(window))
+                                {
+                                    windowState.AddInvisibleFrame();
+                                }
+                                else if (GetWindowMetricsIfExists(window) is { } metrics)
+                                {
+                                    windowState.AddFrame(bitmapDC, metrics.ClientLeft, metrics.ClientTop, metrics.ClientWidth, metrics.ClientHeight, metrics.Dpi, zOrder, ref needsGdiFlush);
+                                    zOrder++;
+                                }
+                                else
+                                {
+                                    // The window will be detected as closed
+                                    continue;
+                                }
 
-                            if (!User32.IsWindowVisible(window))
-                            {
-                                windowState.LastSeen = now; // Keep window from being detected as closed
-                                windowState.AddInvisibleFrame();
-                                continue;
-                            }
-
-                            if (GetWindowMetricsIfExists(window) is { } metrics)
-                            {
-                                windowState.LastSeen = now; // Keep window from being detected as closed
-                                windowState.AddFrame(bitmapDC, metrics.ClientLeft, metrics.ClientTop, metrics.ClientWidth, metrics.ClientHeight, metrics.Dpi, zOrder, ref needsGdiFlush);
-                                zOrder++;
+                                windowState.LastSeen = now; // Keeps the window from being detected as closed
                             }
                         }
 
