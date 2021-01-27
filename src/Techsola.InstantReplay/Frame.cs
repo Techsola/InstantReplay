@@ -25,7 +25,7 @@ namespace Techsola.InstantReplay
 
             public void Overwrite(
                 Gdi32.DeviceContextSafeHandle bitmapDC,
-                Gdi32.DeviceContextSafeHandle windowDC,
+                ref Gdi32.DeviceContextSafeHandle windowDC,
                 WindowMetrics windowMetrics,
                 uint zOrder,
                 ref bool needsGdiFlush)
@@ -65,9 +65,17 @@ namespace Techsola.InstantReplay
 
                     Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
+                    retryBitBlt:
                     if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
                     {
                         var lastError = Marshal.GetLastWin32Error();
+                        if ((ERROR)lastError == ERROR.DC_NOT_FOUND)
+                        {
+                            windowDC.Dispose();
+                            windowDC = User32.GetDC(windowDC.HWnd!.Value).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
+                            goto retryBitBlt;
+                        }
+
                         if (lastError != 0) throw new Win32Exception(lastError);
                         needsGdiFlush = true;
                     }

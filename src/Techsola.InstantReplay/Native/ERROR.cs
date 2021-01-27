@@ -13,5 +13,9 @@ namespace Techsola.InstantReplay.Native
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--1300-1699-#ERROR_INVALID_WINDOW_HANDLE"/>
         /// </summary>
         INVALID_WINDOW_HANDLE = 0x578,
+        /// <summary>
+        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--1300-1699-#ERROR_DC_NOT_FOUND"/>
+        /// </summary>
+        DC_NOT_FOUND = 0x591,
     }
 }
