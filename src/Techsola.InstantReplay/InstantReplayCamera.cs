@@ -135,7 +135,7 @@ namespace Techsola.InstantReplay
                                 }
                                 else if (GetWindowMetricsIfExists(window) is { } metrics)
                                 {
-                                    windowState.AddFrame(bitmapDC, metrics.ClientLeft, metrics.ClientTop, metrics.ClientWidth, metrics.ClientHeight, metrics.Dpi, zOrder, ref needsGdiFlush);
+                                    windowState.AddFrame(bitmapDC, metrics, zOrder, ref needsGdiFlush);
                                     zOrder++;
                                 }
                                 else
@@ -263,15 +263,15 @@ namespace Techsola.InstantReplay
                 {
                     for (var i = 0; i < frameList.Length; i++)
                     {
-                        if (frameList[i] is not { WindowClientWidth: > 0, WindowClientHeight: > 0 } frame) continue;
+                        if (frameList[i]?.WindowMetrics is not { ClientWidth: > 0, ClientHeight: > 0 } metrics) continue;
 
                         var frameCount = frameList.Length - i;
                         if (maxFrameCount < frameCount) maxFrameCount = frameCount;
 
-                        if (minLeft > frame.WindowClientLeft) minLeft = frame.WindowClientLeft;
-                        if (minTop > frame.WindowClientTop) minTop = frame.WindowClientTop;
-                        if (maxRight < frame.WindowClientLeft + frame.WindowClientWidth) maxRight = frame.WindowClientLeft + frame.WindowClientWidth;
-                        if (maxBottom < frame.WindowClientTop + frame.WindowClientHeight) maxBottom = frame.WindowClientTop + frame.WindowClientHeight;
+                        if (minLeft > metrics.ClientLeft) minLeft = metrics.ClientLeft;
+                        if (minTop > metrics.ClientTop) minTop = metrics.ClientTop;
+                        if (maxRight < metrics.ClientLeft + metrics.ClientWidth) maxRight = metrics.ClientLeft + metrics.ClientWidth;
+                        if (maxBottom < metrics.ClientTop + metrics.ClientHeight) maxBottom = metrics.ClientTop + metrics.ClientHeight;
                     }
                 }
 
@@ -319,7 +319,7 @@ namespace Techsola.InstantReplay
                     foreach (var frameList in framesByWindow)
                     {
                         var index = i - maxFrameCount + frameList.Length;
-                        if (index >= 0 && frameList[index] is { WindowClientWidth: > 0, WindowClientHeight: > 0 } windowFrame)
+                        if (index >= 0 && frameList[index] is { WindowMetrics: { ClientWidth: > 0, ClientHeight: > 0 } } windowFrame)
                             windowFramesToDraw.Add(windowFrame);
                     }
 

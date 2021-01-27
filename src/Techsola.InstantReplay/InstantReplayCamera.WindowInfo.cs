@@ -34,18 +34,14 @@ namespace Techsola.InstantReplay
 
             public void AddFrame(
                 Gdi32.DeviceContextSafeHandle bitmapDC,
-                int windowClientLeft,
-                int windowClientTop,
-                int windowClientWidth,
-                int windowClientHeight,
-                uint windowDpi,
+                WindowMetrics windowMetrics,
                 uint zOrder,
                 ref bool needsGdiFlush)
             {
                 if (windowDC is null) throw new InvalidOperationException("The window is closed.");
 
                 var frame = frames.GetNextRef() ??= new();
-                frame.Overwrite(bitmapDC, windowDC, windowClientLeft, windowClientTop, windowClientWidth, windowClientHeight, windowDpi, zOrder, ref needsGdiFlush);
+                frame.Overwrite(bitmapDC, windowDC, windowMetrics, zOrder, ref needsGdiFlush);
             }
 
             public void AddInvisibleFrame()
