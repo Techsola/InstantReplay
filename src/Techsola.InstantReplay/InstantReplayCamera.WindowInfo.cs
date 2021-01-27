@@ -7,7 +7,7 @@ namespace Techsola.InstantReplay
     {
         private sealed class WindowState : IDisposable
         {
-            private Gdi32.DeviceContextSafeHandle? windowDC;
+            private User32.WindowDeviceContextSafeHandle? windowDC;
             private readonly CircularBuffer<Frame?> frames;
             private int disposedFrameCount;
 

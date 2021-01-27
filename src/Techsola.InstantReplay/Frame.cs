@@ -25,7 +25,7 @@ namespace Techsola.InstantReplay
 
             public void Overwrite(
                 Gdi32.DeviceContextSafeHandle bitmapDC,
-                ref Gdi32.DeviceContextSafeHandle windowDC,
+                ref User32.WindowDeviceContextSafeHandle windowDC,
                 WindowMetrics windowMetrics,
                 uint zOrder,
                 ref bool needsGdiFlush)
@@ -72,7 +72,7 @@ namespace Techsola.InstantReplay
                         if ((ERROR)lastError == ERROR.DC_NOT_FOUND)
                         {
                             windowDC.Dispose();
-                            windowDC = User32.GetDC(windowDC.HWnd!.Value).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
+                            windowDC = User32.GetDC(windowDC.HWnd).ThrowWithoutLastErrorAvailableIfInvalid(nameof(User32.GetDC));
                             goto retryBitBlt;
                         }
 
