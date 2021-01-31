@@ -6,20 +6,12 @@ using Techsola.InstantReplay.Native;
 
 namespace Techsola.InstantReplay
 {
-    internal readonly struct AnimatedCursorRenderer
+    internal sealed class AnimatedCursorRenderer
     {
-        private readonly Gdi32.DeviceContextSafeHandle deviceContext;
-        private readonly Dictionary<IntPtr, (uint X, uint Y)> cursorHotspotByHandle;
-        private readonly Dictionary<IntPtr, (uint Current, uint Max)> cursorAnimationStepByHandle;
+        private readonly Dictionary<IntPtr, (uint X, uint Y)> cursorHotspotByHandle = new();
+        private readonly Dictionary<IntPtr, (uint Current, uint Max)> cursorAnimationStepByHandle = new();
 
-        public AnimatedCursorRenderer(Gdi32.DeviceContextSafeHandle deviceContext)
-        {
-            this.deviceContext = deviceContext ?? throw new ArgumentNullException(nameof(deviceContext));
-            cursorHotspotByHandle = new();
-            cursorAnimationStepByHandle = new();
-        }
-
-        public void Render(IntPtr cursorHandle, int cursorX, int cursorY)
+        public void Render(Gdi32.DeviceContextSafeHandle deviceContext, IntPtr cursorHandle, int cursorX, int cursorY)
         {
             if (!cursorHotspotByHandle.TryGetValue(cursorHandle, out var cursorHotspot))
             {

@@ -292,7 +292,7 @@ namespace Techsola.InstantReplay
 
                 using var composition = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
 
-                var cursorRenderer = new AnimatedCursorRenderer(composition.DeviceContext);
+                var cursorRenderer = new AnimatedCursorRenderer();
 
                 var stream = new MemoryStream();
                 var writer = new GifWriter(stream);
@@ -337,7 +337,7 @@ namespace Techsola.InstantReplay
                     var frame = frames[i - maxFrameCount + frames.Length];
 
                     if (frame.Cursor is { } cursor)
-                        cursorRenderer.Render(cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
+                        cursorRenderer.Render(composition.DeviceContext, cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
                     if (needsGdiFlush && !Gdi32.GdiFlush())
                         throw new Win32Exception("GdiFlush failed.");
