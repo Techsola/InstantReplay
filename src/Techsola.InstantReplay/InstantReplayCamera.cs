@@ -94,7 +94,13 @@ namespace Techsola.InstantReplay
                     if (isDisabled) return;
 
                     var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
-                    if (!User32.GetCursorInfo(ref cursorInfo)) throw new Win32Exception();
+                    if (!User32.GetCursorInfo(ref cursorInfo))
+                    {
+                        var lastError = Marshal.GetLastWin32Error();
+                        // Access is denied while the workstation is locked.
+                        if ((ERROR)lastError != ERROR.ACCESS_DENIED)
+                            throw new Win32Exception(lastError);
+                    }
 
                     var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
