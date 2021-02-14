@@ -15,6 +15,8 @@ namespace Techsola.InstantReplay
         public ushort Width { get; set; }
         public ushort Height { get; set; }
 
+        public bool IsEmpty => Width == 0 || Height == 0;
+
         public override string ToString()
         {
             return $"Left = {Left}, Top = {Top}, Width = {Width}, Height = {Height}";

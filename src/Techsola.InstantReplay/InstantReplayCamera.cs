@@ -269,8 +269,9 @@ namespace Techsola.InstantReplay
 
                 var frameSink = new FrameSink(renderer.CompositionWidth, renderer.CompositionHeight);
 
-                var currentBuffer = composition1;
-                var lastBuffer = composition2;
+                var comparisonBuffer = composition1;
+                var emitBuffer = composition2;
+                var emitBoundingRectangle = default(UInt16Rectangle);
 
                 var startingTimestamp = frames[frames.Length - renderer.FrameCount].Timestamp;
                 var totalEmittedDelays = 0L;
@@ -278,9 +279,9 @@ namespace Techsola.InstantReplay
                 for (var i = 0; i < renderer.FrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
-                    currentBuffer.Clear(0, 0, renderer.CompositionWidth, renderer.CompositionHeight, out var needsGdiFlush);
+                    comparisonBuffer.Clear(0, 0, renderer.CompositionWidth, renderer.CompositionHeight, out var needsGdiFlush);
 
-                    renderer.Compose(i, currentBuffer, bitmapDC, ref needsGdiFlush);
+                    renderer.Compose(i, comparisonBuffer, bitmapDC, ref needsGdiFlush);
 
                     if (needsGdiFlush && !Gdi32.GdiFlush())
                         throw new Win32Exception("GdiFlush failed.");
@@ -290,35 +291,26 @@ namespace Techsola.InstantReplay
 
                     if (i > 0)
                     {
-                        DiffBoundsDetector.CropToChanges(currentBuffer, lastBuffer, ref boundingRectangle);
+                        DiffBoundsDetector.CropToChanges(emitBuffer, comparisonBuffer, ref boundingRectangle);
 
-                        // TODO: increase the delay rather than emitting a new frame if the rectangle is empty
-                        if (boundingRectangle.Width == 0) boundingRectangle.Width = 1;
-                        if (boundingRectangle.Height == 0) boundingRectangle.Height = 1;
-                    }
+                        if (boundingRectangle.IsEmpty) continue;
 
-                    ushort delayInHundredthsOfASecond;
-                    var isLastFrame = i == renderer.FrameCount - 1;
-                    if (isLastFrame)
-                    {
-                        delayInHundredthsOfASecond = 400;
-                    }
-                    else
-                    {
-                        var nextFrame = frames[i + 1 - renderer.FrameCount + frames.Length];
+                        var changeTimestamp = frames[i - renderer.FrameCount + frames.Length].Timestamp;
                         var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
-                        var totalHundredthsOfASecond = (nextFrame.Timestamp - startingTimestamp) / stopwatchTicksPerHundredthOfASecond;
+                        var totalHundredthsOfASecond = (changeTimestamp - startingTimestamp) / stopwatchTicksPerHundredthOfASecond;
 
-                        delayInHundredthsOfASecond = (ushort)(totalHundredthsOfASecond - totalEmittedDelays);
+                        frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, (ushort)(totalHundredthsOfASecond - totalEmittedDelays));
                         totalEmittedDelays = totalHundredthsOfASecond;
                     }
 
-                    frameSink.EmitFrame(currentBuffer, boundingRectangle, delayInHundredthsOfASecond);
+                    var nextBuffer = emitBuffer;
+                    emitBuffer = comparisonBuffer;
+                    comparisonBuffer = nextBuffer;
 
-                    var nextBuffer = lastBuffer;
-                    lastBuffer = currentBuffer;
-                    currentBuffer = nextBuffer;
+                    emitBoundingRectangle = boundingRectangle;
                 }
+
+                frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, delayInHundredthsOfASecond: 400);
 
                 return frameSink.End();
             }
