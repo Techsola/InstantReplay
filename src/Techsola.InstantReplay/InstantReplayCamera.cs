@@ -290,6 +290,9 @@ namespace Techsola.InstantReplay
                 var currentBuffer = composition1;
                 var lastBuffer = composition2;
 
+                var startingTimestamp = frames[frames.Length - renderer.FrameCount].Timestamp;
+                var totalEmittedDelays = 0L;
+
                 for (var i = 0; i < renderer.FrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
@@ -329,10 +332,12 @@ namespace Techsola.InstantReplay
                     }
                     else
                     {
-                        var frame = frames[i - renderer.FrameCount + frames.Length];
                         var nextFrame = frames[i + 1 - renderer.FrameCount + frames.Length];
                         var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
-                        delayInHundredthsOfASecond = (ushort)((nextFrame.Timestamp - frame.Timestamp) / stopwatchTicksPerHundredthOfASecond);
+                        var totalHundredthsOfASecond = (nextFrame.Timestamp - startingTimestamp) / stopwatchTicksPerHundredthOfASecond;
+
+                        delayInHundredthsOfASecond = (ushort)(totalHundredthsOfASecond - totalEmittedDelays);
+                        totalEmittedDelays = totalHundredthsOfASecond;
                     }
 
                     writer.WriteGraphicControlExtensionBlock(delayInHundredthsOfASecond, transparentColorIndex: null);
