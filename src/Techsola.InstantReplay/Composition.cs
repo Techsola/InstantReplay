@@ -7,12 +7,12 @@ namespace Techsola.InstantReplay
 {
     internal readonly ref struct Composition
     {
-        private readonly byte bytesPerPixel;
-        private readonly uint stride;
         private readonly Gdi32.BitmapSafeHandle bitmap;
-        private readonly unsafe byte* compositionPixelDataPointer;
 
+        public byte BytesPerPixel { get; }
+        public uint Stride { get; }
         public Gdi32.DeviceContextSafeHandle DeviceContext { get; }
+        public unsafe byte* PixelDataPointer { get; }
 
         /// <summary>
         /// Call <see cref="Gdi32.GdiFlush"/> before accessing pixels after batchable GDI functions have been called.
@@ -22,22 +22,17 @@ namespace Techsola.InstantReplay
             unsafe
             {
                 return new(
-                    GetPixelPointer(rectangle.Left, rectangle.Top),
+                    PixelDataPointer + (rectangle.Left * BytesPerPixel) + (rectangle.Top * Stride),
                     rectangle.Width,
-                    stride,
+                    Stride,
                     rectangle.Height);
             }
         }
 
-        public unsafe byte* GetPixelPointer(ushort x, ushort y)
-        {
-            return compositionPixelDataPointer + (x * bytesPerPixel) + (y * stride);
-        }
-
         public Composition(uint width, uint height, ushort bitsPerPixel)
         {
-            bytesPerPixel = (byte)(bitsPerPixel >> 3);
-            stride = (((width * bytesPerPixel) + 3) / 4) * 4;
+            BytesPerPixel = (byte)(bitsPerPixel >> 3);
+            Stride = (((width * BytesPerPixel) + 3) / 4) * 4;
 
             DeviceContext = Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
 
@@ -53,7 +48,7 @@ namespace Techsola.InstantReplay
                 },
             }, Gdi32.DIB.RGB_COLORS, out var pointer, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
 
-            unsafe { compositionPixelDataPointer = (byte*)pointer; }
+            unsafe { PixelDataPointer = (byte*)pointer; }
 
             Gdi32.SelectObject(DeviceContext, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
         }
