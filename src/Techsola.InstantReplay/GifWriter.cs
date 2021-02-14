@@ -157,6 +157,9 @@ namespace Techsola.InstantReplay
         /// </summary>
         public void WriteImageData(byte[] indexedImagePixels, byte bitsPerIndexedPixel)
         {
+            // https://www.w3.org/Graphics/GIF/spec-gif89a.txt, page 31, "ESTABLISH CODE SIZE"
+            if (bitsPerIndexedPixel < 2) bitsPerIndexedPixel = 2;
+
             writer.Write(bitsPerIndexedPixel);
 
             var currentCodeSize = (byte)(bitsPerIndexedPixel + 1);
