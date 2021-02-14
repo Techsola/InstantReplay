@@ -22,11 +22,16 @@ namespace Techsola.InstantReplay
             unsafe
             {
                 return new(
-                    compositionPixelDataPointer + (rectangle.Left * bytesPerPixel) + (rectangle.Top * stride),
+                    GetPixelPointer(rectangle.Left, rectangle.Top),
                     rectangle.Width,
                     stride,
                     rectangle.Height);
             }
+        }
+
+        public unsafe byte* GetPixelPointer(ushort x, ushort y)
+        {
+            return compositionPixelDataPointer + (x * bytesPerPixel) + (y * stride);
         }
 
         public Composition(uint width, uint height, ushort bitsPerPixel)

@@ -1,6 +1,6 @@
 namespace Techsola.InstantReplay
 {
-    internal readonly struct UInt16Rectangle
+    internal struct UInt16Rectangle
     {
         public UInt16Rectangle(ushort left, ushort top, ushort width, ushort height)
         {
@@ -10,10 +10,10 @@ namespace Techsola.InstantReplay
             Height = height;
         }
 
-        public readonly ushort Left { get; }
-        public readonly ushort Top { get; }
-        public readonly ushort Width { get; }
-        public readonly ushort Height { get; }
+        public ushort Left { get; set; }
+        public ushort Top { get; set; }
+        public ushort Width { get; set; }
+        public ushort Height { get; set; }
 
         public override string ToString()
         {
