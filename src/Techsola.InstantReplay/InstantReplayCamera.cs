@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -268,24 +267,7 @@ namespace Techsola.InstantReplay
                 using var composition1 = new Composition(renderer.CompositionWidth, renderer.CompositionHeight, Frame.BitsPerPixel);
                 using var composition2 = new Composition(renderer.CompositionWidth, renderer.CompositionHeight, Frame.BitsPerPixel);
 
-                var stream = new MemoryStream();
-                var writer = new GifWriter(stream);
-
-                writer.BeginStream(
-                    renderer.CompositionWidth,
-                    renderer.CompositionHeight,
-                    globalColorTable: false, // TODO: optimize to use the global color table for the majority palette if more than one frame can use the same palette
-                    sourceImageBitsPerPrimaryColor: 8, // Actually 24, but this is the maximum value. Not used anyway.
-                    globalColorTableIsSorted: false,
-                    globalColorTableSize: 0,
-                    globalColorTableBackgroundColorIndex: 0);
-
-                writer.WriteLoopingExtensionBlock();
-
-                var quantizer = new WuQuantizer();
-
-                var paletteBuffer = new (byte R, byte G, byte B)[256];
-                var indexedImageBuffer = new byte[renderer.CompositionWidth * renderer.CompositionHeight];
+                var frameSink = new FrameSink(renderer.CompositionWidth, renderer.CompositionHeight);
 
                 var currentBuffer = composition1;
                 var lastBuffer = composition2;
@@ -315,15 +297,6 @@ namespace Techsola.InstantReplay
                         if (boundingRectangle.Height == 0) boundingRectangle.Height = 1;
                     }
 
-                    quantizer.Quantize(
-                        currentBuffer.EnumerateRange(boundingRectangle),
-                        paletteBuffer,
-                        out var paletteLength,
-                        indexedImageBuffer,
-                        out var indexedImageLength);
-
-                    var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
-
                     ushort delayInHundredthsOfASecond;
                     var isLastFrame = i == renderer.FrameCount - 1;
                     if (isLastFrame)
@@ -340,29 +313,14 @@ namespace Techsola.InstantReplay
                         totalEmittedDelays = totalHundredthsOfASecond;
                     }
 
-                    writer.WriteGraphicControlExtensionBlock(delayInHundredthsOfASecond, transparentColorIndex: null);
-
-                    writer.WriteImageDescriptor(
-                        left: boundingRectangle.Left,
-                        top: boundingRectangle.Top,
-                        width: boundingRectangle.Width,
-                        height: boundingRectangle.Height,
-                        localColorTable: true,
-                        isInterlaced: false,
-                        localColorTableIsSorted: false,
-                        localColorTableSize: (byte)(bitsPerIndexedPixel - 1)); // Means 2^(localColorTableSize+1) entries
-
-                    writer.WriteColorTable(paletteBuffer, paletteLength: 1 << bitsPerIndexedPixel);
-
-                    writer.WriteImageData(indexedImageBuffer, indexedImageLength, bitsPerIndexedPixel);
+                    frameSink.EmitFrame(currentBuffer, boundingRectangle, delayInHundredthsOfASecond);
 
                     var nextBuffer = lastBuffer;
                     lastBuffer = currentBuffer;
                     currentBuffer = nextBuffer;
                 }
 
-                writer.EndStream();
-                return stream.ToArray();
+                return frameSink.End();
             }
             finally
             {
