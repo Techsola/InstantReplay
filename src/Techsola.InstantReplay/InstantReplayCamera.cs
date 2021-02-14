@@ -284,13 +284,14 @@ namespace Techsola.InstantReplay
                 if (maxFrameCount == 0) return null;
 
                 var compositionOffset = (X: -minLeft, Y: -minTop);
-                var compositionWidth = maxRight - minLeft;
-                var compositionHeight = maxBottom - minTop;
+                var compositionWidth = checked((ushort)(maxRight - minLeft));
+                var compositionHeight = checked((ushort)(maxBottom - minTop));
 
                 if (bitmapDC is not { IsInvalid: false })
                     throw new InvalidOperationException("infoByWindowHandle should be empty if bitmapDC is not valid.");
 
-                using var composition = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
+                using var composition1 = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
+                using var composition2 = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
 
                 var cursorRenderer = new AnimatedCursorRenderer();
 
@@ -298,8 +299,8 @@ namespace Techsola.InstantReplay
                 var writer = new GifWriter(stream);
 
                 writer.BeginStream(
-                    (ushort)compositionWidth,
-                    (ushort)compositionHeight,
+                    compositionWidth,
+                    compositionHeight,
                     globalColorTable: false, // TODO: optimize to use the global color table for the majority palette if more than one frame can use the same palette
                     sourceImageBitsPerPrimaryColor: 8, // Actually 24, but this is the maximum value. Not used anyway.
                     globalColorTableIsSorted: false,
@@ -315,10 +316,13 @@ namespace Techsola.InstantReplay
 
                 var windowFramesToDraw = new List<Frame>();
 
+                var currentBuffer = composition1;
+                var lastBuffer = composition2;
+
                 for (var i = 0; i < maxFrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
-                    composition.Clear(0, 0, compositionWidth, compositionHeight, out var needsGdiFlush);
+                    currentBuffer.Clear(0, 0, compositionWidth, compositionHeight, out var needsGdiFlush);
 
                     windowFramesToDraw.Clear();
 
@@ -332,17 +336,34 @@ namespace Techsola.InstantReplay
                     windowFramesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
 
                     foreach (var windowFrame in windowFramesToDraw)
-                        windowFrame.Compose(bitmapDC, composition.DeviceContext, compositionOffset, ref needsGdiFlush);
+                        windowFrame.Compose(bitmapDC, currentBuffer.DeviceContext, compositionOffset, ref needsGdiFlush);
 
                     var frame = frames[i - maxFrameCount + frames.Length];
 
                     if (frame.Cursor is { } cursor)
-                        cursorRenderer.Render(composition.DeviceContext, cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
+                        cursorRenderer.Render(currentBuffer.DeviceContext, cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
 
                     if (needsGdiFlush && !Gdi32.GdiFlush())
                         throw new Win32Exception("GdiFlush failed.");
 
-                    quantizer.Quantize(composition.Pixels, paletteBuffer, out var paletteLength, indexedImageBuffer);
+                    // TODO: choose initial bounding rectangle based on window frame and cursor bounding rectangles
+                    var boundingRectangle = new UInt16Rectangle(0, 0, compositionWidth, compositionHeight);
+
+                    if (i > 0)
+                    {
+                        DiffBoundsDetector.CropToChanges(currentBuffer, lastBuffer, ref boundingRectangle);
+
+                        // TODO: increase the delay rather than emitting a new frame if the rectangle is empty
+                        if (boundingRectangle.Width == 0) boundingRectangle.Width = 1;
+                        if (boundingRectangle.Height == 0) boundingRectangle.Height = 1;
+                    }
+
+                    quantizer.Quantize(
+                        currentBuffer.EnumerateRange(boundingRectangle),
+                        paletteBuffer,
+                        out var paletteLength,
+                        indexedImageBuffer,
+                        out var indexedImageLength);
 
                     var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
 
@@ -362,17 +383,22 @@ namespace Techsola.InstantReplay
                     writer.WriteGraphicControlExtensionBlock(delayInHundredthsOfASecond, transparentColorIndex: null);
 
                     writer.WriteImageDescriptor(
-                        left: 0, // TODO: optimize to crop to only changed pixels (before choosing a palette, too) and potentially double the length of the previous delay
-                        top: 0,
-                        width: (ushort)compositionWidth,
-                        height: (ushort)compositionHeight,
+                        left: boundingRectangle.Left,
+                        top: boundingRectangle.Top,
+                        width: boundingRectangle.Width,
+                        height: boundingRectangle.Height,
                         localColorTable: true,
                         isInterlaced: false,
                         localColorTableIsSorted: false,
                         localColorTableSize: (byte)(bitsPerIndexedPixel - 1)); // Means 2^(localColorTableSize+1) entries
 
                     writer.WriteColorTable(paletteBuffer, paletteLength: 1 << bitsPerIndexedPixel);
-                    writer.WriteImageData(indexedImageBuffer, bitsPerIndexedPixel);
+
+                    writer.WriteImageData(indexedImageBuffer, indexedImageLength, bitsPerIndexedPixel);
+
+                    var nextBuffer = lastBuffer;
+                    lastBuffer = currentBuffer;
+                    currentBuffer = nextBuffer;
                 }
 
                 writer.EndStream();

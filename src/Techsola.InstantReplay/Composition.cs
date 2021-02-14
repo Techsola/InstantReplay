@@ -7,17 +7,33 @@ namespace Techsola.InstantReplay
 {
     internal readonly ref struct Composition
     {
+        private readonly byte bytesPerPixel;
+        private readonly uint stride;
         private readonly Gdi32.BitmapSafeHandle bitmap;
+        private readonly unsafe byte* compositionPixelDataPointer;
 
         public Gdi32.DeviceContextSafeHandle DeviceContext { get; }
 
         /// <summary>
         /// Call <see cref="Gdi32.GdiFlush"/> before accessing pixels after batchable GDI functions have been called.
         /// </summary>
-        public ColorEnumerable Pixels { get; }
-
-        public Composition(int width, int height, ushort bitsPerPixel)
+        public ColorEnumerable EnumerateRange(UInt16Rectangle rectangle)
         {
+            unsafe
+            {
+                return new(
+                    compositionPixelDataPointer + (rectangle.Left * bytesPerPixel) + (rectangle.Top * stride),
+                    rectangle.Width,
+                    stride,
+                    rectangle.Height);
+            }
+        }
+
+        public Composition(uint width, uint height, ushort bitsPerPixel)
+        {
+            bytesPerPixel = (byte)(bitsPerPixel >> 3);
+            stride = (((width * bytesPerPixel) + 3) / 4) * 4;
+
             DeviceContext = Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
 
             bitmap = Gdi32.CreateDIBSection(DeviceContext, new()
@@ -25,23 +41,16 @@ namespace Techsola.InstantReplay
                 bmiHeader =
                 {
                     biSize = Marshal.SizeOf(typeof(Gdi32.BITMAPINFOHEADER)),
-                    biWidth = width,
-                    biHeight = -height,
+                    biWidth = (int)width,
+                    biHeight = -(int)height,
                     biPlanes = 1,
                     biBitCount = bitsPerPixel,
                 },
-            }, Gdi32.DIB.RGB_COLORS, out var compositionPixelDataPointer, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
+            }, Gdi32.DIB.RGB_COLORS, out var pointer, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
+
+            unsafe { compositionPixelDataPointer = (byte*)pointer; }
 
             Gdi32.SelectObject(DeviceContext, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
-
-            unsafe
-            {
-                Pixels = new(
-                    (byte*)compositionPixelDataPointer,
-                    (uint)width,
-                    stride: ((((uint)width * 3) + 3) / 4) * 4,
-                    (uint)height);
-            }
         }
 
         public void Dispose()

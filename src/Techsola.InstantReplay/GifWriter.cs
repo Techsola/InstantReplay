@@ -155,7 +155,7 @@ namespace Techsola.InstantReplay
         /// <summary>
         /// Immediately follows each local color table and each image descriptor that has no local color table.
         /// </summary>
-        public void WriteImageData(byte[] indexedImagePixels, byte bitsPerIndexedPixel)
+        public void WriteImageData(byte[] indexedImagePixels, uint indexedImageLength, byte bitsPerIndexedPixel)
         {
             // https://www.w3.org/Graphics/GIF/spec-gif89a.txt, page 31, "ESTABLISH CODE SIZE"
             if (bitsPerIndexedPixel < 2) bitsPerIndexedPixel = 2;
@@ -171,7 +171,7 @@ namespace Techsola.InstantReplay
             // Spec requires this to be the first code
             bitPacker.WriteCode(clearCode, currentCodeSize);
 
-            if (indexedImagePixels.Length > 0)
+            if (indexedImageLength > 0)
             {
                 var nextCode = (ushort)(endOfInformationCode + 1);
 
@@ -186,7 +186,7 @@ namespace Techsola.InstantReplay
                     var rootCode = indexedImagePixels[currentIndex];
                     var currentNode = multibyteCodeRoots[rootCode] ??= new(rootCode);
 
-                    while (currentIndex + currentLength < indexedImagePixels.Length)
+                    while (currentIndex + currentLength < indexedImageLength)
                     {
                         currentLength++;
 
