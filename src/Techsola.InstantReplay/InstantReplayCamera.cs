@@ -256,51 +256,24 @@ namespace Techsola.InstantReplay
             try
             {
                 var frames = Frames.ToArray();
-
                 var framesByWindow = InfoByWindowHandle.Values.Select(i => i.GetFramesSnapshot()).ToList();
 
-                var minLeft = int.MaxValue;
-                var maxRight = int.MinValue;
-                var minTop = int.MaxValue;
-                var maxBottom = int.MinValue;
-                var maxFrameCount = 0;
-
-                foreach (var frameList in framesByWindow)
-                {
-                    for (var i = 0; i < frameList.Length; i++)
-                    {
-                        if (frameList[i]?.WindowMetrics is not { ClientWidth: > 0, ClientHeight: > 0 } metrics) continue;
-
-                        var frameCount = frameList.Length - i;
-                        if (maxFrameCount < frameCount) maxFrameCount = frameCount;
-
-                        if (minLeft > metrics.ClientLeft) minLeft = metrics.ClientLeft;
-                        if (minTop > metrics.ClientTop) minTop = metrics.ClientTop;
-                        if (maxRight < metrics.ClientLeft + metrics.ClientWidth) maxRight = metrics.ClientLeft + metrics.ClientWidth;
-                        if (maxBottom < metrics.ClientTop + metrics.ClientHeight) maxBottom = metrics.ClientTop + metrics.ClientHeight;
-                    }
-                }
-
-                if (maxFrameCount == 0) return null;
-
-                var compositionOffset = (X: -minLeft, Y: -minTop);
-                var compositionWidth = checked((ushort)(maxRight - minLeft));
-                var compositionHeight = checked((ushort)(maxBottom - minTop));
+                var renderer = new CompositionRenderer(frames, framesByWindow);
+                if (renderer.FrameCount == 0)
+                    return null;
 
                 if (bitmapDC is not { IsInvalid: false })
                     throw new InvalidOperationException("infoByWindowHandle should be empty if bitmapDC is not valid.");
 
-                using var composition1 = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
-                using var composition2 = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
-
-                var cursorRenderer = new AnimatedCursorRenderer();
+                using var composition1 = new Composition(renderer.CompositionWidth, renderer.CompositionHeight, Frame.BitsPerPixel);
+                using var composition2 = new Composition(renderer.CompositionWidth, renderer.CompositionHeight, Frame.BitsPerPixel);
 
                 var stream = new MemoryStream();
                 var writer = new GifWriter(stream);
 
                 writer.BeginStream(
-                    compositionWidth,
-                    compositionHeight,
+                    renderer.CompositionWidth,
+                    renderer.CompositionHeight,
                     globalColorTable: false, // TODO: optimize to use the global color table for the majority palette if more than one frame can use the same palette
                     sourceImageBitsPerPrimaryColor: 8, // Actually 24, but this is the maximum value. Not used anyway.
                     globalColorTableIsSorted: false,
@@ -312,42 +285,23 @@ namespace Techsola.InstantReplay
                 var quantizer = new WuQuantizer();
 
                 var paletteBuffer = new (byte R, byte G, byte B)[256];
-                var indexedImageBuffer = new byte[compositionWidth * compositionHeight];
-
-                var windowFramesToDraw = new List<Frame>();
+                var indexedImageBuffer = new byte[renderer.CompositionWidth * renderer.CompositionHeight];
 
                 var currentBuffer = composition1;
                 var lastBuffer = composition2;
 
-                for (var i = 0; i < maxFrameCount; i++)
+                for (var i = 0; i < renderer.FrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
-                    currentBuffer.Clear(0, 0, compositionWidth, compositionHeight, out var needsGdiFlush);
+                    currentBuffer.Clear(0, 0, renderer.CompositionWidth, renderer.CompositionHeight, out var needsGdiFlush);
 
-                    windowFramesToDraw.Clear();
-
-                    foreach (var frameList in framesByWindow)
-                    {
-                        var index = i - maxFrameCount + frameList.Length;
-                        if (index >= 0 && frameList[index] is { WindowMetrics: { ClientWidth: > 0, ClientHeight: > 0 } } windowFrame)
-                            windowFramesToDraw.Add(windowFrame);
-                    }
-
-                    windowFramesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
-
-                    foreach (var windowFrame in windowFramesToDraw)
-                        windowFrame.Compose(bitmapDC, currentBuffer.DeviceContext, compositionOffset, ref needsGdiFlush);
-
-                    var frame = frames[i - maxFrameCount + frames.Length];
-
-                    if (frame.Cursor is { } cursor)
-                        cursorRenderer.Render(currentBuffer.DeviceContext, cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
+                    renderer.Compose(i, currentBuffer, bitmapDC, ref needsGdiFlush);
 
                     if (needsGdiFlush && !Gdi32.GdiFlush())
                         throw new Win32Exception("GdiFlush failed.");
 
                     // TODO: choose initial bounding rectangle based on window frame and cursor bounding rectangles
-                    var boundingRectangle = new UInt16Rectangle(0, 0, compositionWidth, compositionHeight);
+                    var boundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
 
                     if (i > 0)
                     {
@@ -368,14 +322,15 @@ namespace Techsola.InstantReplay
                     var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
 
                     ushort delayInHundredthsOfASecond;
-                    var isLastFrame = i == maxFrameCount - 1;
+                    var isLastFrame = i == renderer.FrameCount - 1;
                     if (isLastFrame)
                     {
                         delayInHundredthsOfASecond = 400;
                     }
                     else
                     {
-                        var nextFrame = frames[i + 1 - maxFrameCount + frames.Length];
+                        var frame = frames[i - renderer.FrameCount + frames.Length];
+                        var nextFrame = frames[i + 1 - renderer.FrameCount + frames.Length];
                         var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
                         delayInHundredthsOfASecond = (ushort)((nextFrame.Timestamp - frame.Timestamp) / stopwatchTicksPerHundredthOfASecond);
                     }
