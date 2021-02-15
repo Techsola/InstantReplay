@@ -287,11 +287,11 @@ namespace Techsola.InstantReplay
 
                     renderer.Compose(i, comparisonBuffer, bitmapDC, ref needsGdiFlush);
 
-                    if (needsGdiFlush && !Gdi32.GdiFlush())
-                        throw new Win32Exception("GdiFlush failed.");
-
                     // TODO: choose initial bounding rectangle based on window frame and cursor bounding rectangles
                     var boundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
+
+                    // Required before accessing pixel data
+                    if (needsGdiFlush && !Gdi32.GdiFlush()) throw new Win32Exception("GdiFlush failed.");
 
                     DiffBoundsDetector.CropToChanges(emitBuffer, comparisonBuffer, ref boundingRectangle);
 
