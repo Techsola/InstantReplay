@@ -31,16 +31,10 @@ namespace Techsola.InstantReplay
             if (!cursorAnimationStepByHandle.TryGetValue(cursorHandle, out var cursorAnimationStep))
                 cursorAnimationStep = (Current: 0, Max: uint.MaxValue);
 
-            changedArea = new(
-                (ushort)(cursorX - (int)cursorInfo.Hotspot.X),
-                (ushort)(cursorY - (int)cursorInfo.Hotspot.Y),
-                (ushort)cursorInfo.Size.Width,
-                (ushort)cursorInfo.Size.Height);
-
             while (!User32.DrawIconEx(
                 deviceContext,
-                changedArea.Left,
-                changedArea.Top,
+                cursorX - (int)cursorInfo.Hotspot.X,
+                cursorY - (int)cursorInfo.Hotspot.Y,
                 cursorHandle,
                 cxWidth: 0,
                 cyWidth: 0,
@@ -61,6 +55,12 @@ namespace Techsola.InstantReplay
 
             cursorAnimationStep.Current = cursorAnimationStep.Current == cursorAnimationStep.Max ? 0 : cursorAnimationStep.Current + 1;
             cursorAnimationStepByHandle[cursorHandle] = cursorAnimationStep;
+
+            changedArea = new(
+                (ushort)Math.Max(0, cursorX - (int)cursorInfo.Hotspot.X),
+                (ushort)Math.Max(0, cursorY - (int)cursorInfo.Hotspot.Y),
+                (ushort)cursorInfo.Size.Width,
+                (ushort)cursorInfo.Size.Height);
         }
     }
 }
