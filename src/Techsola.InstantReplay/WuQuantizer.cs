@@ -28,7 +28,8 @@ namespace Techsola.InstantReplay
             ColorEnumerable sourceImage,
             (byte R, byte G, byte B)[] paletteBuffer,
             out uint paletteLength,
-            byte[] indexedImageBuffer)
+            byte[] indexedImageBuffer,
+            out uint indexedImageLength)
         {
             if (paletteBuffer.Length != MaxColorCount)
                 throw new ArgumentException($"Palette buffer must be equal to the maximum color count {MaxColorCount}.");
@@ -40,10 +41,10 @@ namespace Techsola.InstantReplay
             var cubes = Partition();
 
             OutputPalette(cubes, paletteBuffer, out paletteLength);
-            OutputIndexedPixels(sourceImage, cubes, indexedImageBuffer);
+            OutputIndexedPixels(sourceImage, cubes, indexedImageBuffer, out indexedImageLength);
         }
 
-        private void OutputIndexedPixels(ColorEnumerable sourceImage, Box[] cubes, byte[] indexedImageBuffer)
+        private void OutputIndexedPixels(ColorEnumerable sourceImage, Box[] cubes, byte[] indexedImageBuffer, out uint indexedImageLength)
         {
             for (var paletteIndex = 0; paletteIndex < cubes.Length; paletteIndex++)
             {
@@ -55,7 +56,7 @@ namespace Techsola.InstantReplay
                             tag[channel1, channel2, channel3] = (byte)paletteIndex;
             }
 
-            var i = 0;
+            var i = 0u;
             foreach (var pixel in sourceImage)
             {
                 indexedImageBuffer[i] = tag[
@@ -64,6 +65,8 @@ namespace Techsola.InstantReplay
                     (pixel.Channel3 >> ChannelIndexShift) + 1];
                 i++;
             }
+
+            indexedImageLength = i;
         }
 
         private void OutputPalette(Box[] cubes, (byte R, byte G, byte B)[] paletteBuffer, out uint paletteLength)

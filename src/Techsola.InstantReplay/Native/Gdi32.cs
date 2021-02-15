@@ -88,6 +88,22 @@ namespace Techsola.InstantReplay.Native
         public static extern bool GdiFlush();
 
         /// <summary>
+        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-getobject"/>
+        /// </summary>
+        [DllImport("gdi32.dll")]
+        public static extern int GetObject(BitmapSafeHandle h, int c, out BITMAP pv);
+
+        /// <summary>
+        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmap"/>
+        /// </summary>
+        public struct BITMAP
+        {
+            public uint bmType, bmWidth, bmHeight, bmWidthBytes;
+            public ushort bmPlanes, bmBitsPixel;
+            public unsafe void* bmBits;
+        }
+
+        /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-selectobject"/>
         /// </summary>
         public static GdiObjectSafeHandle SelectObject(DeviceContextSafeHandle hdc, GdiObjectSafeHandle h)

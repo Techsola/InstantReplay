@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -256,127 +255,78 @@ namespace Techsola.InstantReplay
             try
             {
                 var frames = Frames.ToArray();
-
                 var framesByWindow = InfoByWindowHandle.Values.Select(i => i.GetFramesSnapshot()).ToList();
 
-                var minLeft = int.MaxValue;
-                var maxRight = int.MinValue;
-                var minTop = int.MaxValue;
-                var maxBottom = int.MinValue;
-                var maxFrameCount = 0;
-
-                foreach (var frameList in framesByWindow)
-                {
-                    for (var i = 0; i < frameList.Length; i++)
-                    {
-                        if (frameList[i]?.WindowMetrics is not { ClientWidth: > 0, ClientHeight: > 0 } metrics) continue;
-
-                        var frameCount = frameList.Length - i;
-                        if (maxFrameCount < frameCount) maxFrameCount = frameCount;
-
-                        if (minLeft > metrics.ClientLeft) minLeft = metrics.ClientLeft;
-                        if (minTop > metrics.ClientTop) minTop = metrics.ClientTop;
-                        if (maxRight < metrics.ClientLeft + metrics.ClientWidth) maxRight = metrics.ClientLeft + metrics.ClientWidth;
-                        if (maxBottom < metrics.ClientTop + metrics.ClientHeight) maxBottom = metrics.ClientTop + metrics.ClientHeight;
-                    }
-                }
-
-                if (maxFrameCount == 0) return null;
-
-                var compositionOffset = (X: -minLeft, Y: -minTop);
-                var compositionWidth = maxRight - minLeft;
-                var compositionHeight = maxBottom - minTop;
+                var renderer = new CompositionRenderer(frames, framesByWindow);
+                if (renderer.FrameCount == 0)
+                    return null;
 
                 if (bitmapDC is not { IsInvalid: false })
                     throw new InvalidOperationException("infoByWindowHandle should be empty if bitmapDC is not valid.");
 
-                using var composition = new Composition(compositionWidth, compositionHeight, Frame.BitsPerPixel);
+                using var composition1 = new Composition(renderer.CompositionWidth, renderer.CompositionHeight, Frame.BitsPerPixel);
+                using var composition2 = new Composition(renderer.CompositionWidth, renderer.CompositionHeight, Frame.BitsPerPixel);
 
-                var cursorRenderer = new AnimatedCursorRenderer(composition.DeviceContext);
+                var frameSink = new FrameSink(renderer.CompositionWidth, renderer.CompositionHeight);
 
-                var stream = new MemoryStream();
-                var writer = new GifWriter(stream);
+                var comparisonBuffer = composition1;
+                var emitBuffer = composition2;
 
-                writer.BeginStream(
-                    (ushort)compositionWidth,
-                    (ushort)compositionHeight,
-                    globalColorTable: false, // TODO: optimize to use the global color table for the majority palette if more than one frame can use the same palette
-                    sourceImageBitsPerPrimaryColor: 8, // Actually 24, but this is the maximum value. Not used anyway.
-                    globalColorTableIsSorted: false,
-                    globalColorTableSize: 0,
-                    globalColorTableBackgroundColorIndex: 0);
+                var startingTimestamp = frames[frames.Length - renderer.FrameCount].Timestamp;
+                var totalEmittedDelays = 0L;
 
-                writer.WriteLoopingExtensionBlock();
+                // First frame
+                var needsGdiFlush = false;
+                renderer.Compose(frameIndex: 0, emitBuffer, bitmapDC, ref needsGdiFlush, out var emitBufferNonEmptyArea);
+                var emitBoundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
 
-                var quantizer = new WuQuantizer();
+                var comparisonBufferNonEmptyArea = default(UInt16Rectangle);
 
-                var paletteBuffer = new (byte R, byte G, byte B)[256];
-                var indexedImageBuffer = new byte[compositionWidth * compositionHeight];
-
-                var windowFramesToDraw = new List<Frame>();
-
-                for (var i = 0; i < maxFrameCount; i++)
+                for (var i = 1; i < renderer.FrameCount; i++)
                 {
-                    // TODO: be smarter about the area that actually needs to be cleared?
-                    composition.Clear(0, 0, compositionWidth, compositionHeight, out var needsGdiFlush);
+                    comparisonBuffer.Clear(
+                        comparisonBufferNonEmptyArea.Left,
+                        comparisonBufferNonEmptyArea.Top,
+                        comparisonBufferNonEmptyArea.Width,
+                        comparisonBufferNonEmptyArea.Height,
+                        ref needsGdiFlush);
 
-                    windowFramesToDraw.Clear();
+                    renderer.Compose(i, comparisonBuffer, bitmapDC, ref needsGdiFlush, out comparisonBufferNonEmptyArea);
 
-                    foreach (var frameList in framesByWindow)
+                    var boundingRectangle = emitBufferNonEmptyArea.Union(comparisonBufferNonEmptyArea);
+
+                    // Required before accessing pixel data
+                    if (needsGdiFlush)
                     {
-                        var index = i - maxFrameCount + frameList.Length;
-                        if (index >= 0 && frameList[index] is { WindowMetrics: { ClientWidth: > 0, ClientHeight: > 0 } } windowFrame)
-                            windowFramesToDraw.Add(windowFrame);
+                        if (!Gdi32.GdiFlush()) throw new Win32Exception("GdiFlush failed.");
+                        needsGdiFlush = false;
                     }
 
-                    windowFramesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
+                    DiffBoundsDetector.CropToChanges(emitBuffer, comparisonBuffer, ref boundingRectangle);
 
-                    foreach (var windowFrame in windowFramesToDraw)
-                        windowFrame.Compose(bitmapDC, composition.DeviceContext, compositionOffset, ref needsGdiFlush);
+                    if (boundingRectangle.IsEmpty) continue;
 
-                    var frame = frames[i - maxFrameCount + frames.Length];
+                    var changeTimestamp = frames[i - renderer.FrameCount + frames.Length].Timestamp;
+                    var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
+                    var totalHundredthsOfASecond = (changeTimestamp - startingTimestamp) / stopwatchTicksPerHundredthOfASecond;
 
-                    if (frame.Cursor is { } cursor)
-                        cursorRenderer.Render(cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
+                    frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, (ushort)(totalHundredthsOfASecond - totalEmittedDelays));
+                    totalEmittedDelays = totalHundredthsOfASecond;
 
-                    if (needsGdiFlush && !Gdi32.GdiFlush())
-                        throw new Win32Exception("GdiFlush failed.");
+                    var nextBuffer = emitBuffer;
+                    emitBuffer = comparisonBuffer;
+                    comparisonBuffer = nextBuffer;
 
-                    quantizer.Quantize(composition.Pixels, paletteBuffer, out var paletteLength, indexedImageBuffer);
+                    var nextBufferNonEmptyArea = emitBufferNonEmptyArea;
+                    emitBufferNonEmptyArea = comparisonBufferNonEmptyArea;
+                    comparisonBufferNonEmptyArea = nextBufferNonEmptyArea;
 
-                    var bitsPerIndexedPixel = GetBitsPerPixel(paletteLength);
-
-                    ushort delayInHundredthsOfASecond;
-                    var isLastFrame = i == maxFrameCount - 1;
-                    if (isLastFrame)
-                    {
-                        delayInHundredthsOfASecond = 400;
-                    }
-                    else
-                    {
-                        var nextFrame = frames[i + 1 - maxFrameCount + frames.Length];
-                        var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
-                        delayInHundredthsOfASecond = (ushort)((nextFrame.Timestamp - frame.Timestamp) / stopwatchTicksPerHundredthOfASecond);
-                    }
-
-                    writer.WriteGraphicControlExtensionBlock(delayInHundredthsOfASecond, transparentColorIndex: null);
-
-                    writer.WriteImageDescriptor(
-                        left: 0, // TODO: optimize to crop to only changed pixels (before choosing a palette, too) and potentially double the length of the previous delay
-                        top: 0,
-                        width: (ushort)compositionWidth,
-                        height: (ushort)compositionHeight,
-                        localColorTable: true,
-                        isInterlaced: false,
-                        localColorTableIsSorted: false,
-                        localColorTableSize: (byte)(bitsPerIndexedPixel - 1)); // Means 2^(localColorTableSize+1) entries
-
-                    writer.WriteColorTable(paletteBuffer, paletteLength: 1 << bitsPerIndexedPixel);
-                    writer.WriteImageData(indexedImageBuffer, bitsPerIndexedPixel);
+                    emitBoundingRectangle = boundingRectangle;
                 }
 
-                writer.EndStream();
-                return stream.ToArray();
+                frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, delayInHundredthsOfASecond: 400);
+
+                return frameSink.End();
             }
             finally
             {

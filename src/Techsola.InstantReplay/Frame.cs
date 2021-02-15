@@ -103,19 +103,33 @@ namespace Techsola.InstantReplay
                 WindowMetrics = default;
             }
 
-            public void Compose(Gdi32.DeviceContextSafeHandle bitmapDC, Gdi32.DeviceContextSafeHandle compositionDC, (int X, int Y) compositionOffset, ref bool needsGdiFlush)
+            public void Compose(
+                Gdi32.DeviceContextSafeHandle bitmapDC,
+                Gdi32.DeviceContextSafeHandle compositionDC,
+                (int X, int Y) compositionOffset,
+                ref bool needsGdiFlush,
+                out UInt16Rectangle changedArea)
             {
                 if (bitmap is null || WindowMetrics.ClientWidth == 0 || WindowMetrics.ClientHeight == 0)
+                {
+                    changedArea = default;
                     return;
+                }
 
                 Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
+                changedArea = new(
+                    (ushort)(WindowMetrics.ClientLeft + compositionOffset.X),
+                    (ushort)(WindowMetrics.ClientTop + compositionOffset.Y),
+                    (ushort)WindowMetrics.ClientWidth,
+                    (ushort)WindowMetrics.ClientHeight);
+
                 if (!Gdi32.BitBlt(
                     compositionDC,
-                    WindowMetrics.ClientLeft + compositionOffset.X,
-                    WindowMetrics.ClientTop + compositionOffset.Y,
-                    WindowMetrics.ClientWidth,
-                    WindowMetrics.ClientHeight,
+                    changedArea.Left,
+                    changedArea.Top,
+                    changedArea.Width,
+                    changedArea.Height,
                     bitmapDC,
                     0,
                     0,
