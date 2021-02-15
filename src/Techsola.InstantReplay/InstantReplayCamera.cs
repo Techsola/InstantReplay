@@ -271,15 +271,19 @@ namespace Techsola.InstantReplay
 
                 var comparisonBuffer = composition1;
                 var emitBuffer = composition2;
-                var emitBoundingRectangle = default(UInt16Rectangle);
 
                 var startingTimestamp = frames[frames.Length - renderer.FrameCount].Timestamp;
                 var totalEmittedDelays = 0L;
 
-                for (var i = 0; i < renderer.FrameCount; i++)
+                // First frame
+                var needsGdiFlush = false;
+                renderer.Compose(frameIndex: 0, emitBuffer, bitmapDC, ref needsGdiFlush);
+                var emitBoundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
+
+                for (var i = 1; i < renderer.FrameCount; i++)
                 {
                     // TODO: be smarter about the area that actually needs to be cleared?
-                    comparisonBuffer.Clear(0, 0, renderer.CompositionWidth, renderer.CompositionHeight, out var needsGdiFlush);
+                    comparisonBuffer.Clear(0, 0, renderer.CompositionWidth, renderer.CompositionHeight, out needsGdiFlush);
 
                     renderer.Compose(i, comparisonBuffer, bitmapDC, ref needsGdiFlush);
 
@@ -289,19 +293,16 @@ namespace Techsola.InstantReplay
                     // TODO: choose initial bounding rectangle based on window frame and cursor bounding rectangles
                     var boundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
 
-                    if (i > 0)
-                    {
-                        DiffBoundsDetector.CropToChanges(emitBuffer, comparisonBuffer, ref boundingRectangle);
+                    DiffBoundsDetector.CropToChanges(emitBuffer, comparisonBuffer, ref boundingRectangle);
 
-                        if (boundingRectangle.IsEmpty) continue;
+                    if (boundingRectangle.IsEmpty) continue;
 
-                        var changeTimestamp = frames[i - renderer.FrameCount + frames.Length].Timestamp;
-                        var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
-                        var totalHundredthsOfASecond = (changeTimestamp - startingTimestamp) / stopwatchTicksPerHundredthOfASecond;
+                    var changeTimestamp = frames[i - renderer.FrameCount + frames.Length].Timestamp;
+                    var stopwatchTicksPerHundredthOfASecond = Stopwatch.Frequency / 100;
+                    var totalHundredthsOfASecond = (changeTimestamp - startingTimestamp) / stopwatchTicksPerHundredthOfASecond;
 
-                        frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, (ushort)(totalHundredthsOfASecond - totalEmittedDelays));
-                        totalEmittedDelays = totalHundredthsOfASecond;
-                    }
+                    frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, (ushort)(totalHundredthsOfASecond - totalEmittedDelays));
+                    totalEmittedDelays = totalHundredthsOfASecond;
 
                     var nextBuffer = emitBuffer;
                     emitBuffer = comparisonBuffer;
