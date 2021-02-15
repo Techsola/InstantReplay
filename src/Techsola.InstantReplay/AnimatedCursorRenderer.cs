@@ -8,28 +8,39 @@ namespace Techsola.InstantReplay
 {
     internal sealed class AnimatedCursorRenderer
     {
-        private readonly Dictionary<IntPtr, (uint X, uint Y)> cursorHotspotByHandle = new();
+        private readonly Dictionary<IntPtr, ((uint X, uint Y) Hotspot, (uint Width, uint Height) Size)> cursorInfoByHandle = new();
         private readonly Dictionary<IntPtr, (uint Current, uint Max)> cursorAnimationStepByHandle = new();
 
-        public void Render(Gdi32.DeviceContextSafeHandle deviceContext, IntPtr cursorHandle, int cursorX, int cursorY)
+        public void Render(Gdi32.DeviceContextSafeHandle deviceContext, IntPtr cursorHandle, int cursorX, int cursorY, out UInt16Rectangle changedArea)
         {
-            if (!cursorHotspotByHandle.TryGetValue(cursorHandle, out var cursorHotspot))
+            if (!cursorInfoByHandle.TryGetValue(cursorHandle, out var cursorInfo))
             {
                 if (!User32.GetIconInfo(cursorHandle, out var iconInfo)) throw new Win32Exception();
-                new Gdi32.BitmapSafeHandle(iconInfo.hbmMask).Dispose();
                 new Gdi32.BitmapSafeHandle(iconInfo.hbmColor).Dispose();
 
-                cursorHotspot = (iconInfo.xHotspot, iconInfo.yHotspot);
-                cursorHotspotByHandle.Add(cursorHandle, cursorHotspot);
+                using var bitmapHandle = new Gdi32.BitmapSafeHandle(iconInfo.hbmMask);
+
+                var bytesCopied = Gdi32.GetObject(bitmapHandle, Marshal.SizeOf(typeof(Gdi32.BITMAP)), out var bitmap);
+                if (bytesCopied != Marshal.SizeOf(typeof(Gdi32.BITMAP)))
+                    throw new Win32Exception("GetObject returned an unexpected number of bytes.");
+
+                cursorInfo = ((iconInfo.xHotspot, iconInfo.yHotspot), (bitmap.bmWidth, bitmap.bmHeight));
+                cursorInfoByHandle.Add(cursorHandle, cursorInfo);
             }
 
             if (!cursorAnimationStepByHandle.TryGetValue(cursorHandle, out var cursorAnimationStep))
                 cursorAnimationStep = (Current: 0, Max: uint.MaxValue);
 
+            changedArea = new(
+                (ushort)(cursorX - (int)cursorInfo.Hotspot.X),
+                (ushort)(cursorY - (int)cursorInfo.Hotspot.Y),
+                (ushort)cursorInfo.Size.Width,
+                (ushort)cursorInfo.Size.Height);
+
             while (!User32.DrawIconEx(
                 deviceContext,
-                cursorX - (int)cursorHotspot.X,
-                cursorY - (int)cursorHotspot.Y,
+                changedArea.Left,
+                changedArea.Top,
                 cursorHandle,
                 cxWidth: 0,
                 cyWidth: 0,

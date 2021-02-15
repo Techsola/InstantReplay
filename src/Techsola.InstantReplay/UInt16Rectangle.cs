@@ -1,3 +1,5 @@
+using System;
+
 namespace Techsola.InstantReplay
 {
     internal struct UInt16Rectangle
@@ -20,6 +22,31 @@ namespace Techsola.InstantReplay
         public override string ToString()
         {
             return $"Left = {Left}, Top = {Top}, Width = {Width}, Height = {Height}";
+        }
+
+        public UInt16Rectangle Union(UInt16Rectangle other)
+        {
+            if (IsEmpty) return other;
+            if (other.IsEmpty) return this;
+
+            var left = Math.Min(Left, other.Left);
+            var top = Math.Min(Top, other.Top);
+            var right = Math.Max(Left + Width, other.Left + other.Width);
+            var bottom = Math.Max(Top + Height, other.Top + other.Height);
+
+            return new(left, top, (ushort)(right - left), (ushort)(bottom - top));
+        }
+
+        public UInt16Rectangle Intersect(UInt16Rectangle other)
+        {
+            var left = Math.Max(Left, other.Left);
+            var top = Math.Max(Top, other.Top);
+            var right = Math.Min(Left + Width, other.Left + other.Width);
+            var bottom = Math.Min(Top + Height, other.Top + other.Height);
+
+            if (right < left || bottom < top) return default;
+
+            return new(left, top, (ushort)(right - left), (ushort)(bottom - top));
         }
     }
 }

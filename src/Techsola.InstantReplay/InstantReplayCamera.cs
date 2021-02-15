@@ -277,21 +277,30 @@ namespace Techsola.InstantReplay
 
                 // First frame
                 var needsGdiFlush = false;
-                renderer.Compose(frameIndex: 0, emitBuffer, bitmapDC, ref needsGdiFlush);
+                renderer.Compose(frameIndex: 0, emitBuffer, bitmapDC, ref needsGdiFlush, out var emitBufferNonEmptyArea);
                 var emitBoundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
+
+                var comparisonBufferNonEmptyArea = default(UInt16Rectangle);
 
                 for (var i = 1; i < renderer.FrameCount; i++)
                 {
-                    // TODO: be smarter about the area that actually needs to be cleared?
-                    comparisonBuffer.Clear(0, 0, renderer.CompositionWidth, renderer.CompositionHeight, out needsGdiFlush);
+                    comparisonBuffer.Clear(
+                        comparisonBufferNonEmptyArea.Left,
+                        comparisonBufferNonEmptyArea.Top,
+                        comparisonBufferNonEmptyArea.Width,
+                        comparisonBufferNonEmptyArea.Height,
+                        ref needsGdiFlush);
 
-                    renderer.Compose(i, comparisonBuffer, bitmapDC, ref needsGdiFlush);
+                    renderer.Compose(i, comparisonBuffer, bitmapDC, ref needsGdiFlush, out comparisonBufferNonEmptyArea);
 
-                    // TODO: choose initial bounding rectangle based on window frame and cursor bounding rectangles
-                    var boundingRectangle = new UInt16Rectangle(0, 0, renderer.CompositionWidth, renderer.CompositionHeight);
+                    var boundingRectangle = emitBufferNonEmptyArea.Union(comparisonBufferNonEmptyArea);
 
                     // Required before accessing pixel data
-                    if (needsGdiFlush && !Gdi32.GdiFlush()) throw new Win32Exception("GdiFlush failed.");
+                    if (needsGdiFlush)
+                    {
+                        if (!Gdi32.GdiFlush()) throw new Win32Exception("GdiFlush failed.");
+                        needsGdiFlush = false;
+                    }
 
                     DiffBoundsDetector.CropToChanges(emitBuffer, comparisonBuffer, ref boundingRectangle);
 
@@ -307,6 +316,10 @@ namespace Techsola.InstantReplay
                     var nextBuffer = emitBuffer;
                     emitBuffer = comparisonBuffer;
                     comparisonBuffer = nextBuffer;
+
+                    var nextBufferNonEmptyArea = emitBufferNonEmptyArea;
+                    emitBufferNonEmptyArea = comparisonBufferNonEmptyArea;
+                    comparisonBufferNonEmptyArea = nextBufferNonEmptyArea;
 
                     emitBoundingRectangle = boundingRectangle;
                 }

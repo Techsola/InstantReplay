@@ -52,7 +52,12 @@ namespace Techsola.InstantReplay
                 cursorRenderer = new();
             }
 
-            public void Compose(int frameIndex, Composition buffer, Gdi32.DeviceContextSafeHandle bitmapDC, ref bool needsGdiFlush)
+            public void Compose(
+                int frameIndex,
+                Composition buffer,
+                Gdi32.DeviceContextSafeHandle bitmapDC,
+                ref bool needsGdiFlush,
+                out UInt16Rectangle changedArea)
             {
                 var windowFramesToDraw = new List<Frame>();
 
@@ -65,13 +70,23 @@ namespace Techsola.InstantReplay
 
                 windowFramesToDraw.Sort((a, b) => b.ZOrder.CompareTo(a.ZOrder));
 
+                changedArea = default;
+
                 foreach (var windowFrame in windowFramesToDraw)
-                    windowFrame.Compose(bitmapDC, buffer.DeviceContext, compositionOffset, ref needsGdiFlush);
+                {
+                    windowFrame.Compose(bitmapDC, buffer.DeviceContext, compositionOffset, ref needsGdiFlush, out var additionalChangedArea);
+                    changedArea = changedArea.Union(additionalChangedArea);
+                }
 
                 var frame = frames[frameIndex - FrameCount + frames.Length];
 
                 if (frame.Cursor is { } cursor)
-                    cursorRenderer.Render(buffer.DeviceContext, cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y);
+                {
+                    cursorRenderer.Render(buffer.DeviceContext, cursor.Handle, cursor.X + compositionOffset.X, cursor.Y + compositionOffset.Y, out var additionalChangedArea);
+                    changedArea = changedArea.Union(additionalChangedArea);
+                }
+
+                changedArea = changedArea.Intersect(new(0, 0, CompositionWidth, CompositionHeight));
             }
         }
     }
