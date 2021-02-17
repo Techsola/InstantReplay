@@ -1,0 +1,17 @@
+BitBlt
+BITMAP
+ClientToScreen
+CreateCompatibleDC
+CreateDIBSection
+DrawIconEx
+EnumWindows
+GdiFlush
+GetClientRect
+GetCursorInfo
+GetDC
+GetIconInfo
+GetObject
+GetWindowThreadProcessId
+IsWindowVisible
+SelectObject
+SetLastError
