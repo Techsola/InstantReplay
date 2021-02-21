@@ -38,6 +38,8 @@ namespace Techsola.InstantReplay
         private static readonly CircularBuffer<(long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)> Frames = new(BufferSize);
         private static bool isDisabled;
 
+        private static readonly SharedResultMutex<byte[]?> SaveGifSharedResultMutex = new(SaveGifCore);
+
         /// <summary>
         /// <para>
         /// Begins buffering up to ten seconds of screenshots for all windows in the current process, including windows
@@ -254,7 +256,9 @@ namespace Techsola.InstantReplay
         /// </para>
         /// </summary>
 #endif
-        public static byte[]? SaveGif()
+        public static byte[]? SaveGif() => SaveGifSharedResultMutex.GetResult();
+
+        private static byte[]? SaveGifCore()
         {
             if (isDisabled) return null;
 
