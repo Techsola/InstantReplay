@@ -33,10 +33,12 @@ namespace Techsola.InstantReplay
         private static Action<Exception>? reportBackgroundException;
         private static WindowEnumerator? windowEnumerator;
         private static Gdi32.DeviceContextSafeHandle? bitmapDC;
-        private static readonly ReaderWriterLockSlim FrameLock = new();
+        private static readonly object FrameLock = new();
         private static readonly Dictionary<IntPtr, WindowState> InfoByWindowHandle = new();
         private static readonly CircularBuffer<(long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)> Frames = new(BufferSize);
         private static bool isDisabled;
+
+        private static readonly SharedResultMutex<byte[]?> SaveGifSharedResultMutex = new(SaveGifCore);
 
         /// <summary>
         /// <para>
@@ -87,9 +89,16 @@ namespace Techsola.InstantReplay
 
             try
             {
-                if (!FrameLock.TryEnterWriteLock(TimeSpan.Zero)) return;
+                var lockTaken = false;
                 try
                 {
+#if NET35
+                    lockTaken = Monitor.TryEnter(FrameLock);
+#else
+                    Monitor.TryEnter(FrameLock, ref lockTaken);
+#endif
+                    if (!lockTaken) return;
+
                     if (isDisabled) return;
 
                     var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
@@ -181,7 +190,7 @@ namespace Techsola.InstantReplay
                 }
                 finally
                 {
-                    FrameLock.ExitWriteLock();
+                    if (lockTaken) Monitor.Exit(FrameLock);
                 }
             }
 #pragma warning disable CA1031 // If this is not caught, the runtime forcibly terminates the app.
@@ -247,12 +256,13 @@ namespace Techsola.InstantReplay
         /// </para>
         /// </summary>
 #endif
-        public static byte[]? SaveGif()
+        public static byte[]? SaveGif() => SaveGifSharedResultMutex.GetResult();
+
+        private static byte[]? SaveGifCore()
         {
             if (isDisabled) return null;
 
-            FrameLock.EnterReadLock();
-            try
+            lock (FrameLock)
             {
                 var frames = Frames.ToArray();
                 var framesByWindow = InfoByWindowHandle.Values.Select(i => i.GetFramesSnapshot()).ToList();
@@ -327,10 +337,6 @@ namespace Techsola.InstantReplay
                 frameSink.EmitFrame(emitBuffer, emitBoundingRectangle, delayInHundredthsOfASecond: 400);
 
                 return frameSink.End();
-            }
-            finally
-            {
-                FrameLock.ExitReadLock();
             }
         }
 

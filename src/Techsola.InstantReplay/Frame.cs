@@ -69,7 +69,7 @@ namespace Techsola.InstantReplay
                     if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
                     {
                         var lastError = Marshal.GetLastWin32Error();
-                        if ((ERROR)lastError == ERROR.DC_NOT_FOUND)
+                        if ((ERROR)lastError is ERROR.INVALID_WINDOW_HANDLE or ERROR.DC_NOT_FOUND)
                         {
                             windowDC.Dispose();
                             windowDC = User32.GetDC(windowDC.HWnd);
