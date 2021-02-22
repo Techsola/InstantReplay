@@ -50,6 +50,7 @@ namespace Techsola.InstantReplay
                             bitmap.Dispose();
                         }
 
+                        Kernel32.SetLastError(0xDEADBEEF);
                         bitmap = Gdi32.CreateDIBSection(bitmapDC, new()
                         {
                             bmiHeader =
@@ -60,15 +61,36 @@ namespace Techsola.InstantReplay
                                 biPlanes = 1,
                                 biBitCount = BitsPerPixel,
                             },
-                        }, Gdi32.DIB.RGB_COLORS, ppvBits: out _, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
+                        }, Gdi32.DIB.RGB_COLORS, ppvBits: out _, hSection: IntPtr.Zero, offset: 0);
+
+                        if (bitmap.IsInvalid)
+                        {
+                            var lastError = Marshal.GetLastWin32Error();
+                            if ((uint)lastError == 0xDEADBEEF)
+                            {
+                                var flushSucceeded = Gdi32.GdiFlush();
+                                var flushError = Marshal.GetLastWin32Error();
+                                throw new Win32Exception($"CreateDIBSection returned false but did not set the last error.");
+                            }
+
+                            throw new Win32Exception($"CreateDIBSection failed with last error code {lastError}");
+                        }
                     }
 
                     Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
                     retryBitBlt:
+                    Kernel32.SetLastError(0xDEADBEEF);
                     if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
                     {
                         var lastError = Marshal.GetLastWin32Error();
+                        if ((uint)lastError == 0xDEADBEEF)
+                        {
+                            var flushSucceeded = Gdi32.GdiFlush();
+                            var flushError = Marshal.GetLastWin32Error();
+                            throw new Win32Exception($"BitBlt returned false but did not set the last error. GdiFlush(): {flushSucceeded}. Last error after GdiFlush: {flushError}");
+                        }
+
                         if ((ERROR)lastError is ERROR.INVALID_WINDOW_HANDLE or ERROR.DC_NOT_FOUND)
                         {
                             windowDC.Dispose();
@@ -85,7 +107,15 @@ namespace Techsola.InstantReplay
                             goto retryBitBlt;
                         }
 
-                        if (lastError != 0) throw new Win32Exception(lastError);
+                        if (lastError != 0)
+                        {
+                            var flushSucceeded = Gdi32.GdiFlush();
+                            var flushError = Marshal.GetLastWin32Error();
+
+                            var isWindowVisible = User32.IsWindowVisible(windowDC.HWnd);
+                            using var dcHandle = User32.GetDC(windowDC.HWnd);
+                            throw new Win32Exception(lastError, $"BitBlt failed with last error code {lastError}. GdiFlush(): {flushSucceeded}. Last error after GdiFlush: {flushError}. IsWindowVisible({windowDC.HWnd}): {isWindowVisible}. GetDC({windowDC.HWnd}): {dcHandle.DangerousGetHandle()}");
+                        }
                         needsGdiFlush = true;
                     }
                     else
