@@ -66,6 +66,7 @@ namespace Techsola.InstantReplay
                     Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
 
                     retryBitBlt:
+                    Kernel32.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
                     if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
                     {
                         var lastError = Marshal.GetLastWin32Error();
@@ -124,6 +125,7 @@ namespace Techsola.InstantReplay
                     (ushort)WindowMetrics.ClientWidth,
                     (ushort)WindowMetrics.ClientHeight);
 
+                Kernel32.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
                 if (!Gdi32.BitBlt(
                     compositionDC,
                     changedArea.Left,
