@@ -356,7 +356,7 @@ namespace Techsola.InstantReplay
             if (paletteLength > 2) return 2;
             return 1;
 #else
-            return paletteLength <= 2 ? 1 :
+            return paletteLength <= 2 ? (byte)1 :
                 (byte)((sizeof(uint) * 8) - System.Numerics.BitOperations.LeadingZeroCount(paletteLength - 1));
 #endif
         }
