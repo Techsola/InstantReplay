@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $configuration = 'Release'
 $artifactsDir = Join-Path (Resolve-Path .) 'artifacts'
 $packagesDir = Join-Path $artifactsDir 'Packages'
+$testResultsDir = Join-Path $artifactsDir 'Test results'
 $logsDir = Join-Path $artifactsDir 'Logs'
 
 # Detection
@@ -58,3 +59,9 @@ if ($SigningCertThumbprint) {
         & $nuget sign $packagesDir\*.$extension -CertificateFingerprint $SigningCertThumbprint -Timestamper $TimestampServer
     }
 }
+
+# Test
+Remove-Item -Recurse -Force $testResultsDir -ErrorAction Ignore
+
+dotnet test --no-build --configuration $configuration --logger trx --results-directory $testResultsDir /bl:"$logsDir\test.binlog"
+if ($LastExitCode) { exit 1 }
