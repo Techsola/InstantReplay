@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Techsola.InstantReplay.Native
 {
@@ -20,6 +21,7 @@ namespace Techsola.InstantReplay.Native
             /// <summary>
             /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-releasedc"/>
             /// </summary>
+            [SupportedOSPlatform("windows")]
             [DllImport("user32.dll")]
             private static extern bool ReleaseDC(IntPtr hWnd, IntPtr hDC);
         }

@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		src\Directory.Build.props = src\Directory.Build.props
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Techsola.InstantReplay.Tests", "src\Techsola.InstantReplay.Tests\Techsola.InstantReplay.Tests.csproj", "{8AEB15F7-0FCC-48C5-B9B8-41177DFAD6D9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{A773CBD9-5495-4132-A6B6-95EE331564E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A773CBD9-5495-4132-A6B6-95EE331564E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A773CBD9-5495-4132-A6B6-95EE331564E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AEB15F7-0FCC-48C5-B9B8-41177DFAD6D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AEB15F7-0FCC-48C5-B9B8-41177DFAD6D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AEB15F7-0FCC-48C5-B9B8-41177DFAD6D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AEB15F7-0FCC-48C5-B9B8-41177DFAD6D9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
