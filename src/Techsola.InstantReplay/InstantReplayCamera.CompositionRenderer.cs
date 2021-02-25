@@ -45,9 +45,19 @@ namespace Techsola.InstantReplay
                 }
 
                 FrameCount = maxFrameCount;
-                compositionOffset = (X: -minLeft, Y: -minTop);
-                CompositionWidth = checked((ushort)(maxRight - minLeft));
-                CompositionHeight = checked((ushort)(maxBottom - minTop));
+
+                if (maxFrameCount == 0)
+                {
+                    compositionOffset = default;
+                    CompositionWidth = default;
+                    CompositionHeight = default;
+                }
+                else
+                {
+                    compositionOffset = (X: -minLeft, Y: -minTop);
+                    CompositionWidth = checked((ushort)(maxRight - minLeft));
+                    CompositionHeight = checked((ushort)(maxBottom - minTop));
+                }
 
                 cursorRenderer = new();
             }
