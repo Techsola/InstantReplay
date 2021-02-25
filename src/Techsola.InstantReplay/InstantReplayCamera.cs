@@ -221,10 +221,7 @@ namespace Techsola.InstantReplay
                 throw new Win32Exception(lastError);
             }
 
-            var dpi = User32.GetDpiForWindow(window);
-            if (dpi == 0) return null; // This is what happens when the window handle becomes invalid.
-
-            return new(clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom, dpi);
+            return new(clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom);
         }
 
 #if !NET35

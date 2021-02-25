@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Techsola.InstantReplay.Native
 {
@@ -8,12 +9,14 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-clienttoscreen"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll")]
         public static extern bool ClientToScreen(IntPtr hWnd, out POINT lpPoint);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-drawiconex"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool DrawIconEx(Gdi32.DeviceContextSafeHandle hdc, int xLeft, int yTop, IntPtr hIcon, int cxWidth, int cyWidth, uint istepIfAniCur, IntPtr hbrFlickerFreeDraw, DI diFlags);
 
@@ -37,6 +40,7 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll")]
         public static extern bool EnumWindows(WNDENUMPROC lpfn, IntPtr lParam);
 
@@ -48,12 +52,14 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclientrect"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getcursorinfo"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetCursorInfo(ref CURSORINFO pci);
 
@@ -89,18 +95,14 @@ namespace Techsola.InstantReplay.Native
             return new(hWnd, GetDC_PInvoke(hWnd));
         }
 
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll", EntryPoint = "GetDC")]
         private static extern IntPtr GetDC_PInvoke(IntPtr hWnd);
 
         /// <summary>
-        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdpiforwindow"/>
-        /// </summary>
-        [DllImport("user32.dll")]
-        public static extern uint GetDpiForWindow(IntPtr hwnd);
-
-        /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-geticoninfo"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetIconInfo(IntPtr hIcon, out ICONINFO piconinfo);
 
@@ -119,12 +121,14 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll")]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowvisible"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("user32.dll")]
         public static extern bool IsWindowVisible(IntPtr hWnd);
     }

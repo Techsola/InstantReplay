@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 #pragma warning disable 649
 
@@ -10,12 +11,14 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-bitblt"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll", SetLastError = true)]
         public static extern bool BitBlt(DeviceContextSafeHandle hdc, int x, int y, int cx, int cy, DeviceContextSafeHandle hdcSrc, int x1, int y1, RasterOperation rop);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-bitblt"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll", SetLastError = true)]
         public static extern bool BitBlt(DeviceContextSafeHandle hdc, int x, int y, int cx, int cy, IntPtr hdcSrc, int x1, int y1, RasterOperation rop);
 
@@ -35,12 +38,14 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createcompatibledc"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll")]
         public static extern CreatedDeviceContextSafeHandle CreateCompatibleDC(IntPtr hdc);
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createdibsection"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll", SetLastError = true)]
         public static extern BitmapSafeHandle CreateDIBSection(DeviceContextSafeHandle hdc, in BITMAPINFO pbmi, DIB usage, out IntPtr ppvBits, IntPtr hSection, uint offset);
 
@@ -84,12 +89,14 @@ namespace Techsola.InstantReplay.Native
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gdiflush"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll")]
         public static extern bool GdiFlush();
 
         /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-getobject"/>
         /// </summary>
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll")]
         public static extern int GetObject(BitmapSafeHandle h, int c, out BITMAP pv);
 
@@ -111,6 +118,7 @@ namespace Techsola.InstantReplay.Native
             return new(SelectObject_PInvoke(hdc, h), ownsHandle: false);
         }
 
+        [SupportedOSPlatform("windows")]
         [DllImport("gdi32.dll", EntryPoint = "SelectObject", SetLastError = true)]
         private static extern IntPtr SelectObject_PInvoke(DeviceContextSafeHandle hdc, GdiObjectSafeHandle h);
     }
