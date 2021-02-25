@@ -100,13 +100,6 @@ namespace Techsola.InstantReplay.Native
         private static extern IntPtr GetDC_PInvoke(IntPtr hWnd);
 
         /// <summary>
-        /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdpiforwindow"/>
-        /// </summary>
-        [DllImport("user32.dll")]
-        [SupportedOSPlatform("windows10.0.14393")]
-        public static extern uint GetDpiForWindow(IntPtr hwnd);
-
-        /// <summary>
         /// <seealso href="https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-geticoninfo"/>
         /// </summary>
         [SupportedOSPlatform("windows")]
