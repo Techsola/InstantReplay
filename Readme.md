@@ -20,8 +20,6 @@ Produces an animated GIF on demand of the last ten seconds of a Windows desktop 
 
 - Pixel-perfect recording of **non-client** areas of the app windows (but improvements will be considered)
 
-- **Async I/O**: There’s enough CPU-blocking work in encoding a GIF that it’s preferable to create it on a background thread. Once that is happening, it’s okay for a desktop app to continue blocking the same background thread on the occasional I/O delay because this call is rare. It’s not as though a desktop app would be saving thousands of GIFs concurrently and run into throughput issues.
-
 ## Is this for me?
 
 While other integrations could happen in the future, right now this library only works with Windows desktop applications that have access to native Win32 APIs.
@@ -61,7 +59,7 @@ For a Windows Forms app, the ideal place for this call is in `Program.Main` befo
 
 Whenever you want a GIF of the last ten seconds of the app’s user interface, call `InstantReplayCamera.SaveGif();` to obtain a byte array containing an animated GIF. (Or `null`, if there are currently no frames to save.) A good place to do this is in your app’s top-level unhandled exception reporter so that you get a recording of the UI along with the exception information.
 
-TODO: Recommend the use of `Task.Run` when on a UI thread due to the CPU-blocking work it takes to encode a GIF.
+ℹ Consider calling `InstantReplayCamera.SaveGif` on a non-UI thread using `Task.Run` due to the CPU-blocking work it takes to encode a GIF. This way the user interface doesn't pause for even a split second.
 
 ## Debugging into Techsola.InstantReplay source
 
