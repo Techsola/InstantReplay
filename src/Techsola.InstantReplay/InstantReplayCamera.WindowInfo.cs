@@ -1,6 +1,6 @@
 using System;
-using Microsoft.Windows.Sdk;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
 
 namespace Techsola.InstantReplay
 {

@@ -5,8 +5,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Microsoft.Windows.Sdk;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.UI.DisplayDevices;
+using Windows.Win32.UI.MenusAndResources;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay
 {
@@ -119,7 +122,7 @@ namespace Techsola.InstantReplay
                     {
                         Frames.Add((
                             Timestamp: now,
-                            Cursor: (cursorInfo.flags & (CURSORINFO_flags.CURSOR_SHOWING | CURSORINFO_flags.CURSOR_SUPPRESSED)) == CURSORINFO_flags.CURSOR_SHOWING
+                            Cursor: (cursorInfo.flags & (CURSORINFO_FLAGS.CURSOR_SHOWING | CURSORINFO_FLAGS.CURSOR_SUPPRESSED)) == CURSORINFO_FLAGS.CURSOR_SHOWING
                                 ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
                                 : null));
 

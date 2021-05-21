@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Microsoft.Windows.Sdk;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.UI.MenusAndResources;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay
 {
@@ -26,7 +29,9 @@ namespace Techsola.InstantReplay
                 var bitmap = default(BITMAP);
                 unsafe
                 {
-                    var bytesCopied = PInvoke.GetObject(bitmapHandle, Marshal.SizeOf(typeof(BITMAP)), &bitmap);
+                    // Workaround for https://github.com/microsoft/CsWin32/issues/275
+                    //                                  ↓↓↓↓↓↓↓↓↓            ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+                    var bytesCopied = PInvoke.GetObject((HGDIOBJ)bitmapHandle.DangerousGetHandle(), Marshal.SizeOf(typeof(BITMAP)), &bitmap);
                     if (bytesCopied != Marshal.SizeOf(typeof(BITMAP)))
                         throw new Win32Exception("GetObject returned an unexpected number of bytes.");
                 }

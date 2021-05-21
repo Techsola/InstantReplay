@@ -1,8 +1,9 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Microsoft.Windows.Sdk;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.Graphics.Gdi;
 
 namespace Techsola.InstantReplay
 {

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
-using Microsoft.Windows.Sdk;
+using Windows.Win32;
+using Windows.Win32.System.SystemServices;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay
 {

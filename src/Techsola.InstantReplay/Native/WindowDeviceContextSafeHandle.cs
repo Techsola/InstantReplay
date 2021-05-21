@@ -1,7 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Microsoft.Windows.Sdk;
+using Windows.Win32;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay.Native
 {

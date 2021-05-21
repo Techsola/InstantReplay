@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using Microsoft.Windows.Sdk;
+using Windows.Win32;
+using Windows.Win32.UI.MenusAndResources;
 
 namespace Techsola.InstantReplay
 {
