@@ -6,6 +6,9 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay
 {
@@ -32,10 +35,10 @@ namespace Techsola.InstantReplay
         private static Timer? timer;
         private static Action<Exception>? reportBackgroundException;
         private static WindowEnumerator? windowEnumerator;
-        private static Gdi32.DeviceContextSafeHandle? bitmapDC;
+        private static DeleteDCSafeHandle? bitmapDC;
         private static readonly object FrameLock = new();
-        private static readonly Dictionary<IntPtr, WindowState> InfoByWindowHandle = new();
-        private static readonly CircularBuffer<(long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)> Frames = new(BufferSize);
+        private static readonly Dictionary<HWND, WindowState> InfoByWindowHandle = new();
+        private static readonly CircularBuffer<(long Timestamp, (int X, int Y, HCURSOR Handle)? Cursor)> Frames = new(BufferSize);
         private static bool isDisabled;
 
         private static readonly SharedResultMutex<byte[]?> SaveGifSharedResultMutex = new(SaveGifCore);
@@ -101,8 +104,8 @@ namespace Techsola.InstantReplay
 
                     if (isDisabled) return;
 
-                    var cursorInfo = new User32.CURSORINFO { cbSize = Marshal.SizeOf(typeof(User32.CURSORINFO)) };
-                    if (!User32.GetCursorInfo(ref cursorInfo))
+                    var cursorInfo = new CURSORINFO { cbSize = (uint)Marshal.SizeOf(typeof(CURSORINFO)) };
+                    if (!PInvoke.GetCursorInfo(ref cursorInfo))
                     {
                         var lastError = Marshal.GetLastWin32Error();
                         // Access is denied while the workstation is locked.
@@ -112,13 +115,13 @@ namespace Techsola.InstantReplay
 
                     var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
-                    bitmapDC ??= Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
+                    bitmapDC ??= PInvoke.CreateCompatibleDC(null).ThrowWithoutLastErrorAvailableIfInvalid(nameof(PInvoke.CreateCompatibleDC));
 
                     lock (InfoByWindowHandle)
                     {
                         Frames.Add((
                             Timestamp: now,
-                            Cursor: (cursorInfo.flags & (User32.CURSOR.SHOWING | User32.CURSOR.SUPPRESSED)) == User32.CURSOR.SHOWING
+                            Cursor: (cursorInfo.flags & (CURSORINFO_FLAGS.CURSOR_SHOWING | CURSORINFO_FLAGS.CURSOR_SUPPRESSED)) == CURSORINFO_FLAGS.CURSOR_SHOWING
                                 ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
                                 : null));
 
@@ -130,7 +133,8 @@ namespace Techsola.InstantReplay
                             if (!InfoByWindowHandle.TryGetValue(window, out var windowState))
                             {
                                 // The window hasn't been seen before
-                                if (User32.IsWindowVisible(window) && User32.GetDC(window) is { IsInvalid: false } windowDC)
+                                if (PInvoke.IsWindowVisible(window)
+                                    && new WindowDeviceContextSafeHandle(window, PInvoke.GetDC(window)) is { IsInvalid: false } windowDC)
                                 {
                                     windowState = new(windowDC, firstSeen: now, BufferSize);
                                     InfoByWindowHandle.Add(window, windowState);
@@ -143,7 +147,7 @@ namespace Techsola.InstantReplay
                                 {
                                     // No frames have been added yet
                                 }
-                                else if (!User32.IsWindowVisible(window))
+                                else if (!PInvoke.IsWindowVisible(window))
                                 {
                                     windowState.AddInvisibleFrame();
                                 }
@@ -164,10 +168,10 @@ namespace Techsola.InstantReplay
 
                         // Make sure to flush on the same thread that called the GDI function in case this thread goes away.
                         // (https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-gdiflush#remarks)
-                        if (needsGdiFlush && !Gdi32.GdiFlush())
+                        if (needsGdiFlush && !PInvoke.GdiFlush())
                             throw new Win32Exception("GdiFlush failed.");
 
-                        var closedWindowsWithNoFrames = new List<IntPtr>();
+                        var closedWindowsWithNoFrames = new List<HWND>();
 
                         foreach (var entry in InfoByWindowHandle)
                         {
@@ -209,12 +213,13 @@ namespace Techsola.InstantReplay
             }
         }
 
-        private static WindowMetrics? GetWindowMetricsIfExists(IntPtr window)
+        private static WindowMetrics? GetWindowMetricsIfExists(HWND window)
         {
-            if (!User32.ClientToScreen(window, out var clientTopLeft))
+            var clientTopLeft = default(POINT);
+            if (!PInvoke.ClientToScreen(window, ref clientTopLeft))
                 return null; // This is what happens when the window handle becomes invalid.
 
-            if (!User32.GetClientRect(window, out var clientRect))
+            if (!PInvoke.GetClientRect(window, out var clientRect))
             {
                 var lastError = Marshal.GetLastWin32Error();
                 if ((ERROR)lastError == ERROR.INVALID_WINDOW_HANDLE) return null;
@@ -305,7 +310,7 @@ namespace Techsola.InstantReplay
                     // Required before accessing pixel data
                     if (needsGdiFlush)
                     {
-                        if (!Gdi32.GdiFlush()) throw new Win32Exception("GdiFlush failed.");
+                        if (!PInvoke.GdiFlush()) throw new Win32Exception("GdiFlush failed.");
                         needsGdiFlush = false;
                     }
 

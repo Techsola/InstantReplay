@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay
 {
@@ -11,36 +14,46 @@ namespace Techsola.InstantReplay
         private readonly Dictionary<IntPtr, ((uint X, uint Y) Hotspot, (uint Width, uint Height) Size)> cursorInfoByHandle = new();
         private readonly Dictionary<IntPtr, (uint Current, uint Max)> cursorAnimationStepByHandle = new();
 
-        public void Render(Gdi32.DeviceContextSafeHandle deviceContext, IntPtr cursorHandle, int cursorX, int cursorY, out UInt16Rectangle changedArea)
+        public void Render(DeleteDCSafeHandle deviceContext, HCURSOR cursorHandle, int cursorX, int cursorY, out UInt16Rectangle changedArea)
         {
             if (!cursorInfoByHandle.TryGetValue(cursorHandle, out var cursorInfo))
             {
-                if (!User32.GetIconInfo(cursorHandle, out var iconInfo)) throw new Win32Exception();
-                new Gdi32.BitmapSafeHandle(iconInfo.hbmColor).Dispose();
+                // Workaround for https://github.com/microsoft/CsWin32/issues/256
+                //                       ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+                if (!PInvoke.GetIconInfo(new UnownedHandle(cursorHandle), out var iconInfo)) throw new Win32Exception();
+                new DeleteObjectSafeHandle(iconInfo.hbmColor).Dispose();
 
-                using var bitmapHandle = new Gdi32.BitmapSafeHandle(iconInfo.hbmMask);
+                using var bitmapHandle = new DeleteObjectSafeHandle(iconInfo.hbmMask);
 
-                var bytesCopied = Gdi32.GetObject(bitmapHandle, Marshal.SizeOf(typeof(Gdi32.BITMAP)), out var bitmap);
-                if (bytesCopied != Marshal.SizeOf(typeof(Gdi32.BITMAP)))
-                    throw new Win32Exception("GetObject returned an unexpected number of bytes.");
+                var bitmap = default(BITMAP);
+                unsafe
+                {
+                    // Workaround for https://github.com/microsoft/CsWin32/issues/275
+                    //                                  ↓↓↓↓↓↓↓↓↓            ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+                    var bytesCopied = PInvoke.GetObject((HGDIOBJ)bitmapHandle.DangerousGetHandle(), Marshal.SizeOf(typeof(BITMAP)), &bitmap);
+                    if (bytesCopied != Marshal.SizeOf(typeof(BITMAP)))
+                        throw new Win32Exception("GetObject returned an unexpected number of bytes.");
+                }
 
-                cursorInfo = ((iconInfo.xHotspot, iconInfo.yHotspot), (bitmap.bmWidth, bitmap.bmHeight));
+                cursorInfo = ((iconInfo.xHotspot, iconInfo.yHotspot), ((uint)bitmap.bmWidth, (uint)bitmap.bmHeight));
                 cursorInfoByHandle.Add(cursorHandle, cursorInfo);
             }
 
             if (!cursorAnimationStepByHandle.TryGetValue(cursorHandle, out var cursorAnimationStep))
                 cursorAnimationStep = (Current: 0, Max: uint.MaxValue);
 
-            while (!User32.DrawIconEx(
+            while (!PInvoke.DrawIconEx(
                 deviceContext,
                 cursorX - (int)cursorInfo.Hotspot.X,
                 cursorY - (int)cursorInfo.Hotspot.Y,
-                cursorHandle,
+                /* Workaround for https://github.com/microsoft/CsWin32/issues/256
+                ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ */
+                new UnownedHandle(cursorHandle),
                 cxWidth: 0,
                 cyWidth: 0,
                 cursorAnimationStep.Current,
-                hbrFlickerFreeDraw: IntPtr.Zero,
-                User32.DI.NORMAL))
+                hbrFlickerFreeDraw: null,
+                DI_FLAGS.DI_NORMAL))
             {
                 var lastError = Marshal.GetLastWin32Error();
 

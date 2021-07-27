@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="DotNetAnalyzers.DocumentationAnalyzers" Version="1.0.0-beta.59" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.1.506-beta" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,6 +2,8 @@ using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.Graphics.Gdi;
 
 namespace Techsola.InstantReplay
 {
@@ -11,7 +13,7 @@ namespace Techsola.InstantReplay
         {
             public const int BitsPerPixel = 24;
 
-            private Gdi32.BitmapSafeHandle? bitmap;
+            private DeleteObjectSafeHandle? bitmap;
             private int bitmapWidth;
             private int bitmapHeight;
 
@@ -24,8 +26,8 @@ namespace Techsola.InstantReplay
             }
 
             public void Overwrite(
-                Gdi32.DeviceContextSafeHandle bitmapDC,
-                ref User32.WindowDeviceContextSafeHandle windowDC,
+                DeleteDCSafeHandle bitmapDC,
+                ref WindowDeviceContextSafeHandle windowDC,
                 WindowMetrics windowMetrics,
                 uint zOrder,
                 ref bool needsGdiFlush)
@@ -50,30 +52,35 @@ namespace Techsola.InstantReplay
                             bitmap.Dispose();
                         }
 
-                        bitmap = Gdi32.CreateDIBSection(bitmapDC, new()
+                        unsafe
                         {
-                            bmiHeader =
+                            bitmap = PInvoke.CreateDIBSection(bitmapDC, new()
                             {
-                                biSize = Marshal.SizeOf(typeof(Gdi32.BITMAPINFOHEADER)),
-                                biWidth = bitmapWidth,
-                                biHeight = -bitmapHeight,
-                                biPlanes = 1,
-                                biBitCount = BitsPerPixel,
-                            },
-                        }, Gdi32.DIB.RGB_COLORS, ppvBits: out _, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
+                                bmiHeader =
+                                {
+                                    biSize = (uint)Marshal.SizeOf(typeof(BITMAPINFOHEADER)),
+                                    biWidth = bitmapWidth,
+                                    biHeight = -bitmapHeight,
+                                    biPlanes = 1,
+                                    biBitCount = BitsPerPixel,
+                                },
+                            }, DIB_USAGE.DIB_RGB_COLORS, ppvBits: out _, hSection: null, offset: 0).ThrowLastErrorIfInvalid();
+                        }
                     }
 
-                    Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
+                    // Workaround for https://github.com/microsoft/CsWin32/issues/199
+                    if (PInvoke.SelectObject(bitmapDC, (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
+                        throw new Win32Exception("SelectObject failed.");
 
                     retryBitBlt:
-                    Kernel32.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
-                    if (!Gdi32.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, Gdi32.RasterOperation.SRCCOPY))
+                    PInvoke.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
+                    if (!PInvoke.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, ROP_CODE.SRCCOPY))
                     {
                         var lastError = Marshal.GetLastWin32Error();
                         if ((ERROR)lastError is ERROR.INVALID_WINDOW_HANDLE or ERROR.DC_NOT_FOUND)
                         {
                             windowDC.Dispose();
-                            windowDC = User32.GetDC(windowDC.HWnd);
+                            windowDC = new(windowDC.HWnd, PInvoke.GetDC(windowDC.HWnd));
                             if (windowDC.IsInvalid)
                             {
                                 // This happens when the window goes away. Let this be detected on the next cycle, if it
@@ -105,8 +112,8 @@ namespace Techsola.InstantReplay
             }
 
             public void Compose(
-                Gdi32.DeviceContextSafeHandle bitmapDC,
-                Gdi32.DeviceContextSafeHandle compositionDC,
+                DeleteDCSafeHandle bitmapDC,
+                DeleteDCSafeHandle compositionDC,
                 (int X, int Y) compositionOffset,
                 ref bool needsGdiFlush,
                 out UInt16Rectangle changedArea)
@@ -117,7 +124,9 @@ namespace Techsola.InstantReplay
                     return;
                 }
 
-                Gdi32.SelectObject(bitmapDC, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
+                // Workaround for https://github.com/microsoft/CsWin32/issues/199
+                if (PInvoke.SelectObject(bitmapDC, (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
+                    throw new Win32Exception("SelectObject failed.");
 
                 changedArea = new(
                     (ushort)(WindowMetrics.ClientLeft + compositionOffset.X),
@@ -125,8 +134,8 @@ namespace Techsola.InstantReplay
                     (ushort)WindowMetrics.ClientWidth,
                     (ushort)WindowMetrics.ClientHeight);
 
-                Kernel32.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
-                if (!Gdi32.BitBlt(
+                PInvoke.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
+                if (!PInvoke.BitBlt(
                     compositionDC,
                     changedArea.Left,
                     changedArea.Top,
@@ -135,7 +144,7 @@ namespace Techsola.InstantReplay
                     bitmapDC,
                     0,
                     0,
-                    Gdi32.RasterOperation.SRCCOPY))
+                    ROP_CODE.SRCCOPY))
                 {
                     var lastError = Marshal.GetLastWin32Error();
                     if (lastError != 0) throw new Win32Exception(lastError);

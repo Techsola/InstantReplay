@@ -1,21 +1,21 @@
-using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.Graphics.Gdi;
 
 namespace Techsola.InstantReplay
 {
     internal readonly ref struct Composition
     {
-        private readonly Gdi32.BitmapSafeHandle bitmap;
+        private readonly DeleteObjectSafeHandle bitmap;
 
         public byte BytesPerPixel { get; }
         public uint Stride { get; }
-        public Gdi32.DeviceContextSafeHandle DeviceContext { get; }
+        public DeleteDCSafeHandle DeviceContext { get; }
         public unsafe byte* PixelDataPointer { get; }
 
         /// <summary>
-        /// Call <see cref="Gdi32.GdiFlush"/> before accessing pixels after batchable GDI functions have been called.
+        /// Call <see cref="PInvoke.GdiFlush"/> before accessing pixels after batchable GDI functions have been called.
         /// </summary>
         public ColorEnumerable EnumerateRange(UInt16Rectangle rectangle)
         {
@@ -34,23 +34,27 @@ namespace Techsola.InstantReplay
             BytesPerPixel = (byte)(bitsPerPixel >> 3);
             Stride = (((width * BytesPerPixel) + 3) / 4) * 4;
 
-            DeviceContext = Gdi32.CreateCompatibleDC(IntPtr.Zero).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.CreateCompatibleDC));
-
-            bitmap = Gdi32.CreateDIBSection(DeviceContext, new()
+            DeviceContext = PInvoke.CreateCompatibleDC(null).ThrowWithoutLastErrorAvailableIfInvalid(nameof(PInvoke.CreateCompatibleDC));
+            unsafe
             {
-                bmiHeader =
+                bitmap = PInvoke.CreateDIBSection(DeviceContext, new()
                 {
-                    biSize = Marshal.SizeOf(typeof(Gdi32.BITMAPINFOHEADER)),
-                    biWidth = (int)width,
-                    biHeight = -(int)height,
-                    biPlanes = 1,
-                    biBitCount = bitsPerPixel,
-                },
-            }, Gdi32.DIB.RGB_COLORS, out var pointer, hSection: IntPtr.Zero, offset: 0).ThrowLastErrorIfInvalid();
+                    bmiHeader =
+                    {
+                        biSize = (uint)Marshal.SizeOf(typeof(BITMAPINFOHEADER)),
+                        biWidth = (int)width,
+                        biHeight = -(int)height,
+                        biPlanes = 1,
+                        biBitCount = bitsPerPixel,
+                    },
+                }, DIB_USAGE.DIB_RGB_COLORS, out var pointer, hSection: null, offset: 0).ThrowLastErrorIfInvalid();
 
-            unsafe { PixelDataPointer = (byte*)pointer; }
+                PixelDataPointer = (byte*)pointer;
+            }
 
-            Gdi32.SelectObject(DeviceContext, bitmap).ThrowWithoutLastErrorAvailableIfInvalid(nameof(Gdi32.SelectObject));
+            // Workaround for https://github.com/microsoft/CsWin32/issues/199
+            if (PInvoke.SelectObject(DeviceContext, (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
+                throw new Win32Exception("SelectObject failed.");
         }
 
         public void Dispose()
@@ -63,7 +67,7 @@ namespace Techsola.InstantReplay
         {
             if (width <= 0 || height <= 0) return;
 
-            if (!Gdi32.BitBlt(DeviceContext, x, y, width, height, IntPtr.Zero, 0, 0, Gdi32.RasterOperation.BLACKNESS))
+            if (!PInvoke.BitBlt(DeviceContext, x, y, width, height, null, 0, 0, ROP_CODE.BLACKNESS))
             {
                 var lastError = Marshal.GetLastWin32Error();
                 if (lastError != 0) throw new Win32Exception(lastError);

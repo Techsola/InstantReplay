@@ -1,5 +1,6 @@
 using System;
 using Techsola.InstantReplay.Native;
+using Windows.Win32;
 
 namespace Techsola.InstantReplay
 {
@@ -7,14 +8,14 @@ namespace Techsola.InstantReplay
     {
         private sealed class WindowState : IDisposable
         {
-            private User32.WindowDeviceContextSafeHandle? windowDC;
+            private WindowDeviceContextSafeHandle? windowDC;
             private readonly CircularBuffer<Frame?> frames;
             private int disposedFrameCount;
 
             public long FirstSeen { get; }
             public long LastSeen { get; set; }
 
-            public WindowState(User32.WindowDeviceContextSafeHandle windowDC, long firstSeen, int bufferSize)
+            public WindowState(WindowDeviceContextSafeHandle windowDC, long firstSeen, int bufferSize)
             {
                 this.windowDC = windowDC;
                 FirstSeen = firstSeen;
@@ -31,7 +32,7 @@ namespace Techsola.InstantReplay
             }
 
             public void AddFrame(
-                Gdi32.DeviceContextSafeHandle bitmapDC,
+                DeleteDCSafeHandle bitmapDC,
                 WindowMetrics windowMetrics,
                 uint zOrder,
                 ref bool needsGdiFlush)

@@ -1,6 +1,0 @@
-[*]
-resharper_inconsistent_naming_highlighting = none
-resharper_identifier_typo_highlighting = none
-
-# IDE1006: Naming rule violation
-dotnet_diagnostic.IDE1006.severity = none

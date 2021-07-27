@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
-using Techsola.InstantReplay.Native;
+using Windows.Win32;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay
 {
@@ -8,7 +8,7 @@ namespace Techsola.InstantReplay
     {
         private readonly struct CompositionRenderer
         {
-            private readonly (long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)[] frames;
+            private readonly (long Timestamp, (int X, int Y, HCURSOR Handle)? Cursor)[] frames;
             private readonly List<Frame?[]> framesByWindow;
             private readonly (int X, int Y) compositionOffset;
             private readonly AnimatedCursorRenderer cursorRenderer;
@@ -17,7 +17,7 @@ namespace Techsola.InstantReplay
             public ushort CompositionWidth { get; }
             public ushort CompositionHeight { get; }
 
-            public CompositionRenderer((long Timestamp, (int X, int Y, IntPtr Handle)? Cursor)[] frames, List<Frame?[]> framesByWindow)
+            public CompositionRenderer((long Timestamp, (int X, int Y, HCURSOR Handle)? Cursor)[] frames, List<Frame?[]> framesByWindow)
             {
                 this.frames = frames;
                 this.framesByWindow = framesByWindow;
@@ -65,7 +65,7 @@ namespace Techsola.InstantReplay
             public void Compose(
                 int frameIndex,
                 Composition buffer,
-                Gdi32.DeviceContextSafeHandle bitmapDC,
+                DeleteDCSafeHandle bitmapDC,
                 ref bool needsGdiFlush,
                 out UInt16Rectangle changedArea)
             {
