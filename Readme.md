@@ -24,11 +24,11 @@ Produces an animated GIF on demand of the last ten seconds of a Windows desktop 
 
 While other integrations could happen in the future, right now this library only works with Windows desktop applications that have access to native Win32 APIs.
 
-| App model     | Supported    |
-|---------------|--------------|
-| Windows Forms | ✔            |
-| WPF           | ✔ (untested) |
-| UWP           | ❌           |
+| App model     | Supported |
+|---------------|-----------|
+| Windows Forms | ✔         |
+| WPF           | ✔         |
+| UWP           | ❌        |
 
 To continue fleshing out the list: support currently depends on whether the app is able to [invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke) native Windows functions such as [`BitBlt`](https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-bitblt) and [`EnumWindows`](https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows).
 
