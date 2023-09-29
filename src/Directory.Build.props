@@ -1,21 +1,16 @@
 <Project>
 
   <PropertyGroup>
-    <LangVersion>9.0</LangVersion>
+    <LangVersion>12</LangVersion>
     <Nullable>enable</Nullable>
-    <AnalysisLevel>5</AnalysisLevel>
+    <AnalysisLevel>8</AnalysisLevel>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <NoWarn>RA1000</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="TunnelVisionLabs.ReferenceAssemblyAnnotator" Version="1.0.0-alpha.160" PrivateAssets="all" />
-    <PackageDownload Include="Microsoft.NETCore.App.Ref" Version="[5.0.0]" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Needed for net3.5 support until .NET 6 SDK -->
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all" />
+    <PackageDownload Include="Microsoft.NETCore.App.Ref" Version="[6.0.0]" />
   </ItemGroup>
 
 </Project>
