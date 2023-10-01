@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -115,14 +116,14 @@ namespace Techsola.InstantReplay
 
                     var currentWindows = (windowEnumerator ??= new()).GetCurrentWindowHandlesInZOrder();
 
-                    bitmapDC ??= PInvoke.CreateCompatibleDC(null).ThrowWithoutLastErrorAvailableIfInvalid(nameof(PInvoke.CreateCompatibleDC));
+                    bitmapDC ??= new DeleteDCSafeHandle(PInvoke.CreateCompatibleDC(default)).ThrowWithoutLastErrorAvailableIfInvalid(nameof(PInvoke.CreateCompatibleDC));
 
                     lock (InfoByWindowHandle)
                     {
                         Frames.Add((
                             Timestamp: now,
                             Cursor: (cursorInfo.flags & (CURSORINFO_FLAGS.CURSOR_SHOWING | CURSORINFO_FLAGS.CURSOR_SUPPRESSED)) == CURSORINFO_FLAGS.CURSOR_SHOWING
-                                ? (cursorInfo.ptScreenPos.x, cursorInfo.ptScreenPos.y, cursorInfo.hCursor)
+                                ? (cursorInfo.ptScreenPos.X, cursorInfo.ptScreenPos.Y, cursorInfo.hCursor)
                                 : null));
 
                         var zOrder = 0u;
@@ -215,7 +216,7 @@ namespace Techsola.InstantReplay
 
         private static WindowMetrics? GetWindowMetricsIfExists(HWND window)
         {
-            var clientTopLeft = default(POINT);
+            var clientTopLeft = default(Point);
             if (!PInvoke.ClientToScreen(window, ref clientTopLeft))
                 return null; // This is what happens when the window handle becomes invalid.
 
@@ -226,7 +227,7 @@ namespace Techsola.InstantReplay
                 throw new Win32Exception(lastError);
             }
 
-            return new(clientTopLeft.x, clientTopLeft.y, clientRect.right, clientRect.bottom);
+            return new(clientTopLeft.X, clientTopLeft.Y, clientRect.right, clientRect.bottom);
         }
 
 #if !NET35
