@@ -52,29 +52,40 @@ namespace Techsola.InstantReplay
                             bitmap.Dispose();
                         }
 
-                        unsafe
+                        var bitmapDCNeedsRelease = false;
+                        bitmapDC.DangerousAddRef(ref bitmapDCNeedsRelease);
+                        try
                         {
-                            bitmap = PInvoke.CreateDIBSection(bitmapDC, new()
+                            unsafe
                             {
-                                bmiHeader =
+                                var bitmapInfo = new BITMAPINFO
                                 {
-                                    biSize = (uint)Marshal.SizeOf(typeof(BITMAPINFOHEADER)),
-                                    biWidth = bitmapWidth,
-                                    biHeight = -bitmapHeight,
-                                    biPlanes = 1,
-                                    biBitCount = BitsPerPixel,
-                                },
-                            }, DIB_USAGE.DIB_RGB_COLORS, ppvBits: out _, hSection: null, offset: 0).ThrowLastErrorIfInvalid();
+                                    bmiHeader =
+                                    {
+                                        biSize = (uint)Marshal.SizeOf(typeof(BITMAPINFOHEADER)),
+                                        biWidth = bitmapWidth,
+                                        biHeight = -bitmapHeight,
+                                        biPlanes = 1,
+                                        biBitCount = BitsPerPixel,
+                                    },
+                                };
+
+                                bitmap = PInvoke.CreateDIBSection((HDC)bitmapDC.DangerousGetHandle(), &bitmapInfo, DIB_USAGE.DIB_RGB_COLORS, ppvBits: out _, hSection: null, offset: 0).ThrowLastErrorIfInvalid();
+                            }
+                        }
+                        finally
+                        {
+                            if (bitmapDCNeedsRelease) bitmapDC.DangerousRelease();
                         }
                     }
 
                     // Workaround for https://github.com/microsoft/CsWin32/issues/199
-                    if (PInvoke.SelectObject(bitmapDC, (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
+                    if (PInvoke.SelectObject((HDC)bitmapDC.DangerousGetHandle(), (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
                         throw new Win32Exception("SelectObject failed.");
 
                     retryBitBlt:
                     PInvoke.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
-                    if (!PInvoke.BitBlt(bitmapDC, 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, windowDC, 0, 0, ROP_CODE.SRCCOPY))
+                    if (!PInvoke.BitBlt((HDC)bitmapDC.DangerousGetHandle(), 0, 0, windowMetrics.ClientWidth, windowMetrics.ClientHeight, (HDC)windowDC.DangerousGetHandle(), 0, 0, ROP_CODE.SRCCOPY))
                     {
                         var lastError = Marshal.GetLastWin32Error();
                         if ((ERROR)lastError is ERROR.INVALID_WINDOW_HANDLE or ERROR.DC_NOT_FOUND)
@@ -125,7 +136,7 @@ namespace Techsola.InstantReplay
                 }
 
                 // Workaround for https://github.com/microsoft/CsWin32/issues/199
-                if (PInvoke.SelectObject(bitmapDC, (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
+                if (PInvoke.SelectObject((HDC)bitmapDC.DangerousGetHandle(), (HGDIOBJ)bitmap.DangerousGetHandle()).IsNull)
                     throw new Win32Exception("SelectObject failed.");
 
                 changedArea = new(
@@ -136,12 +147,12 @@ namespace Techsola.InstantReplay
 
                 PInvoke.SetLastError(0); // BitBlt doesn't set the last error if it returns false to indicate that the operation has been batched
                 if (!PInvoke.BitBlt(
-                    compositionDC,
+                    (HDC)compositionDC.DangerousGetHandle(),
                     changedArea.Left,
                     changedArea.Top,
                     changedArea.Width,
                     changedArea.Height,
-                    bitmapDC,
+                    (HDC)bitmapDC.DangerousGetHandle(),
                     0,
                     0,
                     ROP_CODE.SRCCOPY))
