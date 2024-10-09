@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Windows.Win32;
+using Techsola.InstantReplay.Native;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Techsola.InstantReplay

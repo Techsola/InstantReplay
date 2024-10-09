@@ -3,6 +3,7 @@ BITMAP
 ClientToScreen
 CreateCompatibleDC
 CreateDIBSection
+DeleteDC
 DrawIconEx
 EnumWindows
 GdiFlush
@@ -13,5 +14,6 @@ GetIconInfo
 GetObject
 GetWindowThreadProcessId
 IsWindowVisible
+ReleaseDC
 SelectObject
 SetLastError

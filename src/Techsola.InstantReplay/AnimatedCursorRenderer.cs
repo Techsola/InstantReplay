@@ -42,28 +42,37 @@ namespace Techsola.InstantReplay
             if (!cursorAnimationStepByHandle.TryGetValue(cursorHandle, out var cursorAnimationStep))
                 cursorAnimationStep = (Current: 0, Max: uint.MaxValue);
 
-            while (!PInvoke.DrawIconEx(
-                deviceContext,
-                cursorX - (int)cursorInfo.Hotspot.X,
-                cursorY - (int)cursorInfo.Hotspot.Y,
-                /* Workaround for https://github.com/microsoft/CsWin32/issues/256
-                ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ */
-                new UnownedHandle(cursorHandle),
-                cxWidth: 0,
-                cyWidth: 0,
-                cursorAnimationStep.Current,
-                hbrFlickerFreeDraw: null,
-                DI_FLAGS.DI_NORMAL))
+            var deviceContextNeedsRelease = false;
+            deviceContext.DangerousAddRef(ref deviceContextNeedsRelease);
+            try
             {
-                var lastError = Marshal.GetLastWin32Error();
-
-                if ((ERROR)lastError == ERROR.INVALID_PARAMETER && cursorAnimationStep.Current > 0)
+                while (!PInvoke.DrawIconEx(
+                    (HDC)deviceContext.DangerousGetHandle(),
+                    cursorX - (int)cursorInfo.Hotspot.X,
+                    cursorY - (int)cursorInfo.Hotspot.Y,
+                    /* Workaround for https://github.com/microsoft/CsWin32/issues/256
+                    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ */
+                    new UnownedHandle(cursorHandle),
+                    cxWidth: 0,
+                    cyWidth: 0,
+                    cursorAnimationStep.Current,
+                    hbrFlickerFreeDraw: null,
+                    DI_FLAGS.DI_NORMAL))
                 {
-                    cursorAnimationStep = (Current: 0, Max: cursorAnimationStep.Current - 1);
-                    continue;
-                }
+                    var lastError = Marshal.GetLastWin32Error();
 
-                throw new Win32Exception(lastError);
+                    if ((ERROR)lastError == ERROR.INVALID_PARAMETER && cursorAnimationStep.Current > 0)
+                    {
+                        cursorAnimationStep = (Current: 0, Max: cursorAnimationStep.Current - 1);
+                        continue;
+                    }
+
+                    throw new Win32Exception(lastError);
+                }
+            }
+            finally
+            {
+                if (deviceContextNeedsRelease) deviceContext.DangerousRelease();
             }
 
             cursorAnimationStep.Current = cursorAnimationStep.Current == cursorAnimationStep.Max ? 0 : cursorAnimationStep.Current + 1;
